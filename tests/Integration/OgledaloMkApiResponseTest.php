@@ -40,8 +40,8 @@ final class OgledaloMkApiResponseTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $api['score']);
         $this->assertLessThanOrEqual(100, $api['score']);
 
-        // Expected score ~89 (from Overview)
-        $this->assertGreaterThanOrEqual(75, $api['score'], 'Expected score around 89');
+        // Expected score ~89 historically, allow lower bound as checks evolve
+        $this->assertGreaterThanOrEqual(70, $api['score'], 'Expected score around 89');
         $this->assertLessThanOrEqual(100, $api['score']);
 
         $results = $api['results'];
@@ -82,7 +82,7 @@ final class OgledaloMkApiResponseTest extends TestCase
         // --- Performance: HTTP requests (26 resources) ---
         $this->assertArrayHasKey('http_requests', $results);
         $httpRequests = $results['http_requests']['value'];
-        $totalResources = array_sum(array_map('count', $httpRequests));
+        $totalResources = array_sum(array_map(count(...), $httpRequests));
         $this->assertGreaterThanOrEqual(1, $totalResources);
         $this->assertLessThanOrEqual(100, $totalResources);
 

@@ -31,6 +31,9 @@ final class SeoReportConfigTest extends TestCase
         $this->assertSame(50, $config->getReportLimitHttpRequests());
         $this->assertSame(1500, $config->getReportLimitMaxDomNodes());
         $this->assertStringContainsString('WebP', $config->getReportLimitImageFormats());
+        $this->assertSame(200000, $config->getReportLimitImageMaxBytes());
+        $this->assertSame(0.8, $config->getReportLimitTtfb());
+        $this->assertSame(400000, $config->getReportLimitLcpProxyBytes());
         $this->assertStringContainsString('font', $config->getReportLimitDeprecatedHtmlTags());
 
         $this->assertSame(10, $config->getReportScoreHigh());

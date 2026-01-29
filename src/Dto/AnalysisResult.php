@@ -9,8 +9,8 @@ final readonly class AnalysisResult
 {
     /** @var array<string, array<int, string>> */
     public const CATEGORIES = [
-        'seo' => ['title', 'title_optimal_length', 'meta_description', 'meta_description_optimal_length', 'headings', 'content_keywords', 'keyword_consistency', 'image_keywords', 'seo_friendly_url', 'canonical_tag', 'hreflang', '404_page', 'robots', 'noindex', 'noindex_header', 'in_page_links', 'nofollow_links', 'link_url_readability', 'language', 'favicon'],
-        'performance' => ['text_compression', 'load_time', 'page_size', 'http_requests', 'image_format', 'defer_javascript', 'minification', 'dom_size', 'doctype'],
+        'seo' => ['title', 'title_optimal_length', 'meta_description', 'meta_description_optimal_length', 'headings', 'h1_usage', 'header_tag_usage', 'content_keywords', 'keyword_consistency', 'image_keywords', 'open_graph', 'twitter_cards', 'seo_friendly_url', 'canonical_tag', 'canonical_self_reference', 'hreflang', '404_page', 'robots', 'noindex', 'robots_directives', 'noindex_header', 'in_page_links', 'nofollow_links', 'link_url_readability', 'language', 'favicon'],
+        'performance' => ['text_compression', 'brotli_compression', 'load_time', 'ttfb', 'page_size', 'http_requests', 'static_cache_headers', 'expires_headers', 'avoid_redirects', 'redirect_chains', 'cookie_free_domains', 'empty_src_or_href', 'image_format', 'image_dimensions', 'image_lazy_loading', 'image_size_optimization', 'lcp_proxy', 'cls_proxy', 'defer_javascript', 'render_blocking_resources', 'minification', 'dom_size', 'doctype'],
         'security' => ['https_encryption', 'http2', 'mixed_content', 'server_signature', 'unsafe_cross_origin_links', 'htst', 'plaintext_email'],
         'miscellaneous' => ['structured_data', 'meta_viewport', 'charset', 'sitemap', 'social', 'content_length', 'text_html_ratio', 'inline_css', 'deprecated_html_tags', 'llms_txt', 'flash_content', 'iframes'],
         'technology' => ['server_ip', 'dns_servers', 'dmarc_record', 'spf_record', 'ssl_certificate', 'reverse_dns', 'analytics', 'technology_detection'],

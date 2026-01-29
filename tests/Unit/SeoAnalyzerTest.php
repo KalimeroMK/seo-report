@@ -17,13 +17,13 @@ use PHPUnit\Framework\TestCase;
 
 final class SeoAnalyzerTest extends TestCase
 {
-    private static function minimalHtml(): string
+    private function minimalHtml(): string
     {
         return (string) file_get_contents(__DIR__ . '/../Fixtures/minimal.html');
     }
 
     /** @param list<Response|\Throwable> $responses */
-    private static function createMockClient(array $responses): Client
+    private function createMockClient(array $responses): Client
     {
         $mock = new MockHandler($responses);
         return new Client(['handler' => HandlerStack::create($mock)]);
@@ -32,13 +32,13 @@ final class SeoAnalyzerTest extends TestCase
     #[Test]
     public function analyze_returns_analysis_result_with_expected_structure(): void
     {
-        $html = self::minimalHtml();
+        $html = $this->minimalHtml();
         $responses = [
             new Response(200, ['Content-Encoding' => ['gzip']], $html),
             new Response(200, [], ''), // 404 check - not 404
             new Response(200, [], "User-agent: *\nSitemap: https://example.com/sitemap.xml"),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $config = new SeoReportConfig([]);
         $analyzer = new SeoAnalyzer($config, $client);
 
@@ -59,13 +59,13 @@ final class SeoAnalyzerTest extends TestCase
     #[Test]
     public function analyze_result_contains_passed_importance_value_for_checks(): void
     {
-        $html = self::minimalHtml();
+        $html = $this->minimalHtml();
         $responses = [
             new Response(200, ['Content-Encoding' => ['gzip']], $html),
             new Response(200, [], ''),
             new Response(200, [], "Sitemap: https://example.com/sitemap.xml"),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -79,15 +79,221 @@ final class SeoAnalyzerTest extends TestCase
     }
 
     #[Test]
-    public function analyze_to_array_is_valid_api_response(): void
+    public function analyze_flags_missing_secondary_headings(): void
     {
-        $html = self::minimalHtml();
+        $html = $this->minimalHtml();
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $headerUsage = $result->getResults()['header_tag_usage'];
+        $this->assertFalse($headerUsage['passed']);
+        $this->assertArrayHasKey('missing', $headerUsage['errors']);
+        $this->assertSame(0, $headerUsage['value']['h2']);
+    }
+
+    #[Test]
+    public function analyze_detects_brotli_compression(): void
+    {
+        $html = $this->minimalHtml();
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['br']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $compression = $result->getResults()['text_compression'];
+        $this->assertTrue($compression['passed']);
+        $brotli = $result->getResults()['brotli_compression'];
+        $this->assertTrue($brotli['passed']);
+    }
+
+    #[Test]
+    public function analyze_detects_render_blocking_resources(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>
+            <link rel="stylesheet" href="/style.css">
+            <link rel="stylesheet" href="/print.css" media="print">
+            <script src="/app.js"></script>
+            <script src="/app-async.js" async></script>
+        </head><body></body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $blocking = $result->getResults()['render_blocking_resources'];
+        $this->assertFalse($blocking['passed']);
+        $this->assertArrayHasKey('errors', $blocking);
+        $this->assertContains('https://example.com/app.js', $blocking['errors']['js']);
+        $this->assertContains('https://example.com/style.css', $blocking['errors']['css']);
+        $this->assertNotContains('https://example.com/print.css', $blocking['errors']['css']);
+        $this->assertNotContains('https://example.com/app-async.js', $blocking['errors']['js']);
+    }
+
+    #[Test]
+    public function analyze_detects_missing_open_graph_and_twitter_tags(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>
+            <meta property="og:title" content="OG Title">
+            <meta name="twitter:card" content="summary">
+        </head><body></body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(404, [], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $openGraph = $result->getResults()['open_graph'];
+        $this->assertFalse($openGraph['passed']);
+        $this->assertContains('og:description', $openGraph['errors']['missing']);
+        $this->assertContains('og:image', $openGraph['errors']['missing']);
+
+        $twitter = $result->getResults()['twitter_cards'];
+        $this->assertFalse($twitter['passed']);
+        $this->assertContains('twitter:title', $twitter['errors']['missing']);
+        $this->assertContains('twitter:description', $twitter['errors']['missing']);
+        $this->assertContains('twitter:image', $twitter['errors']['missing']);
+    }
+
+    #[Test]
+    public function analyze_detects_canonical_self_reference_and_duplicates(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>
+            <link rel="canonical" href="https://example.com/other">
+            <link rel="canonical" href="https://example.com/other">
+        </head><body></body></html>';
         $responses = [
             new Response(200, ['Content-Encoding' => ['gzip']], $html),
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com/page');
+
+        $canonical = $result->getResults()['canonical_self_reference'];
+        $this->assertFalse($canonical['passed']);
+        $this->assertArrayHasKey('not_self_reference', $canonical['errors']);
+        $this->assertArrayHasKey('duplicates', $canonical['errors']);
+    }
+
+    #[Test]
+    public function analyze_detects_restrictive_robots_directives(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>
+            <meta name="robots" content="noarchive, nosnippet">
+        </head><body></body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $robots = $result->getResults()['robots_directives'];
+        $this->assertFalse($robots['passed']);
+        $this->assertContains('noarchive', $robots['errors']['restricted']);
+        $this->assertContains('nosnippet', $robots['errors']['restricted']);
+    }
+
+    #[Test]
+    public function analyze_detects_multiple_h1_tags(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title></head><body>
+            <h1>Main</h1>
+            <h1>Secondary</h1>
+        </body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $h1 = $result->getResults()['h1_usage'];
+        $this->assertFalse($h1['passed']);
+        $this->assertSame(2, $h1['value']);
+        $this->assertSame(2, $h1['errors']['multiple']);
+    }
+
+    #[Test]
+    public function analyze_passes_when_secondary_headings_exist(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>'
+            . '<meta name="description" content="Test"></head>'
+            . '<body><h1>Title</h1><h2>Section</h2><h3>Sub</h3></body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $headerUsage = $result->getResults()['header_tag_usage'];
+        $this->assertTrue($headerUsage['passed']);
+        $this->assertSame(1, $headerUsage['value']['h2']);
+        $this->assertSame(1, $headerUsage['value']['h3']);
+    }
+
+    #[Test]
+    public function analyze_to_array_is_valid_api_response(): void
+    {
+        $html = $this->minimalHtml();
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+        ];
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -119,13 +325,13 @@ final class SeoAnalyzerTest extends TestCase
     #[Test]
     public function analyze_accepts_url_without_scheme_and_prepends_https(): void
     {
-        $html = self::minimalHtml();
+        $html = $this->minimalHtml();
         $responses = [
             new Response(200, ['Content-Encoding' => ['gzip']], $html),
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('example.com');
@@ -142,12 +348,22 @@ final class SeoAnalyzerTest extends TestCase
             <link rel="stylesheet" href="/style.css">
             <link rel="stylesheet" href="/style.min.css">
         </head><body></body></html>';
-        $responses = [
+        $mock = new MockHandler([
             new Response(200, ['Content-Encoding' => ['gzip']], $html),
             new Response(200, [], ''),
             new Response(200, [], ''),
-        ];
-        $client = self::createMockClient($responses);
+        ]);
+        $mock->append(
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], '')
+        );
+        $client = new Client(['handler' => HandlerStack::create($mock)]);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -176,7 +392,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -191,18 +407,188 @@ final class SeoAnalyzerTest extends TestCase
     }
 
     #[Test]
+    public function analyze_detects_missing_expires_headers_and_empty_src_or_href(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title></head><body>
+            <img src="">
+            <a href="">Link</a>
+        </body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $expiresCheck = $result->getResults()['expires_headers'];
+        $this->assertFalse($expiresCheck['passed']);
+        $this->assertArrayHasKey('missing', $expiresCheck['errors']);
+
+        $emptyCheck = $result->getResults()['empty_src_or_href'];
+        $this->assertFalse($emptyCheck['passed']);
+        $this->assertArrayHasKey('errors', $emptyCheck);
+        $this->assertArrayHasKey('empty', $emptyCheck['errors']);
+        $this->assertContains('img[src]', $emptyCheck['errors']['empty']);
+        $this->assertContains('a[href]', $emptyCheck['errors']['empty']);
+    }
+
+    #[Test]
+    public function analyze_flags_cookie_domains_on_static_assets_and_no_redirects(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title></head><body>
+            <img src="https://example.com/logo.png">
+            <script src="/app.js"></script>
+        </body></html>';
+        $responses = [
+            new Response(200, [
+                'Content-Encoding' => ['gzip'],
+                'Cache-Control' => 'max-age=3600',
+                'Set-Cookie' => 'sid=abc; Path=/',
+            ], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600'], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $cookieCheck = $result->getResults()['cookie_free_domains'];
+        $this->assertFalse($cookieCheck['passed']);
+        $this->assertArrayHasKey('cookies_on_static', $cookieCheck['errors']);
+        $this->assertNotEmpty($cookieCheck['errors']['cookies_on_static']);
+
+        $expiresCheck = $result->getResults()['expires_headers'];
+        $this->assertTrue($expiresCheck['passed']);
+
+        $redirectsCheck = $result->getResults()['avoid_redirects'];
+        $this->assertTrue($redirectsCheck['passed']);
+        $this->assertSame(0, $redirectsCheck['value']);
+    }
+
+    #[Test]
+    public function analyze_flags_static_assets_without_cache_headers(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>
+            <link rel="stylesheet" href="/style.css">
+        </head><body>
+            <img src="/hero.jpg">
+        </body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $cacheCheck = $result->getResults()['static_cache_headers'];
+        $this->assertFalse($cacheCheck['passed']);
+        $this->assertArrayHasKey('missing', $cacheCheck['errors']);
+        $this->assertContains('https://example.com/style.css', $cacheCheck['errors']['missing']);
+        $this->assertContains('https://example.com/hero.jpg', $cacheCheck['errors']['missing']);
+    }
+
+    #[Test]
+    public function analyze_flags_image_dimensions_lazy_loading_and_size(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title></head><body>
+            <img src="/hero.jpg">
+        </body></html>';
+        $mock = new MockHandler([
+            new Response(200, ['Content-Encoding' => ['gzip']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(404, [], ''),
+        ]);
+        $mock->append(
+            new Response(200, ['Cache-Control' => 'max-age=3600', 'Content-Length' => '200'], ''),
+            new Response(200, ['Cache-Control' => 'max-age=3600', 'Content-Length' => '200'], '')
+        );
+        $client = new Client(['handler' => HandlerStack::create($mock)]);
+        $config = new SeoReportConfig([
+            'report_limit_image_max_bytes' => 100,
+            'report_limit_lcp_proxy_bytes' => 100,
+        ]);
+        $analyzer = new SeoAnalyzer($config, $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $dimensions = $result->getResults()['image_dimensions'];
+        $this->assertFalse($dimensions['passed']);
+        $this->assertArrayHasKey('missing', $dimensions['errors']);
+
+        $lazy = $result->getResults()['image_lazy_loading'];
+        $this->assertFalse($lazy['passed']);
+        $this->assertContains('https://example.com/hero.jpg', $lazy['errors']['missing']);
+
+        $size = $result->getResults()['image_size_optimization'];
+        $this->assertFalse($size['passed']);
+        $this->assertArrayHasKey('too_large', $size['errors']);
+        $this->assertSame('https://example.com/hero.jpg', $size['errors']['too_large'][0]['url']);
+
+        $lcp = $result->getResults()['lcp_proxy'];
+        $this->assertFalse($lcp['passed']);
+        $this->assertSame('https://example.com/hero.jpg', $lcp['errors']['too_large']['url']);
+
+        $cls = $result->getResults()['cls_proxy'];
+        $this->assertFalse($cls['passed']);
+        $this->assertSame(1, $cls['value']);
+    }
+
+    #[Test]
+    public function analyze_detects_redirect_chains_for_main_and_assets(): void
+    {
+        $html = '<!DOCTYPE html><html><head><title>Test</title>
+            <script src="/app.js"></script>
+        </head><body></body></html>';
+        $responses = [
+            new Response(200, ['Content-Encoding' => ['gzip'], 'X-Guzzle-Redirect-History' => ['http://example.com']], $html),
+            new Response(200, [], ''),
+            new Response(200, [], ''),
+            new Response(404, [], ''),
+            new Response(200, [
+                'Cache-Control' => 'max-age=3600',
+                'X-Guzzle-Redirect-History' => ['https://example.com/app.js'],
+            ], ''),
+        ];
+        $client = $this->createMockClient($responses);
+        $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
+
+        $result = $analyzer->analyze('https://example.com');
+
+        $redirects = $result->getResults()['redirect_chains'];
+        $this->assertFalse($redirects['passed']);
+        $this->assertSame(1, $redirects['errors']['main']);
+        $this->assertSame('https://example.com/app.js', $redirects['errors']['assets'][0]['url']);
+        $this->assertSame(1, $redirects['errors']['assets'][0]['count']);
+    }
+
+    #[Test]
     public function analyze_checks_title_optimal_length(): void
     {
         $htmlShort = '<!DOCTYPE html><html><head><title>Short</title></head><body></body></html>';
         $htmlOptimal = '<!DOCTYPE html><html><head><title>This is an optimal title length between 50-60 chars</title></head><body></body></html>';
-        $htmlLong = '<!DOCTYPE html><html><head><title>This is a very long title that exceeds the optimal length of 60 characters and should fail</title></head><body></body></html>';
 
         $responsesShort = [
             new Response(200, ['Content-Encoding' => ['gzip']], $htmlShort),
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responsesShort);
+        $client = $this->createMockClient($responsesShort);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
         $result = $analyzer->analyze('https://example.com');
         $this->assertArrayHasKey('title_optimal_length', $result->getResults());
@@ -213,7 +599,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responsesOptimal);
+        $client = $this->createMockClient($responsesOptimal);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
         $result = $analyzer->analyze('https://example.com');
         $this->assertTrue($result->getResults()['title_optimal_length']['passed']);
@@ -224,14 +610,13 @@ final class SeoAnalyzerTest extends TestCase
     {
         $htmlShort = '<!DOCTYPE html><html><head><title>Test</title><meta name="description" content="Short"></head><body></body></html>';
         $htmlOptimal = '<!DOCTYPE html><html><head><title>Test</title><meta name="description" content="This is an optimal meta description length between 120-160 characters which is recommended for better SEO results and search engine visibility."></head><body></body></html>';
-        $htmlLong = '<!DOCTYPE html><html><head><title>Test</title><meta name="description" content="This is a very long meta description that exceeds the optimal length of 160 characters and should fail the optimal length check because it is too long for search engine results pages."></head><body></body></html>';
 
         $responsesShort = [
             new Response(200, ['Content-Encoding' => ['gzip']], $htmlShort),
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responsesShort);
+        $client = $this->createMockClient($responsesShort);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
         $result = $analyzer->analyze('https://example.com');
         $this->assertArrayHasKey('meta_description_optimal_length', $result->getResults());
@@ -242,7 +627,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responsesOptimal);
+        $client = $this->createMockClient($responsesOptimal);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
         $result = $analyzer->analyze('https://example.com');
         $this->assertTrue($result->getResults()['meta_description_optimal_length']['passed']);
@@ -260,7 +645,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -285,7 +670,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -313,7 +698,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -342,7 +727,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');
@@ -378,7 +763,7 @@ final class SeoAnalyzerTest extends TestCase
             new Response(200, [], ''),
             new Response(200, [], ''),
         ];
-        $client = self::createMockClient($responses);
+        $client = $this->createMockClient($responses);
         $analyzer = new SeoAnalyzer(new SeoReportConfig([]), $client);
 
         $result = $analyzer->analyze('https://example.com');

@@ -39,6 +39,17 @@ php run_test.php ogledalo.mk | jq
 
 **Output:** JSON API response with analysis results.
 
+## Architecture (Quick Guide)
+
+- `SeoAnalyzer` orchestrates fetching + parsing and then runs action classes.
+- `src/Actions/` groups checks by category: `Seo`, `Performance`, `Security`, `Misc`, `Technology`.
+- Each action implements `AnalysisActionInterface` and returns result keys to merge.
+- `AnalysisContext` carries shared data (DOM, response, stats, config, computed arrays).
+
+Adding a new check:
+1) Create an action class in the right category that implements `AnalysisActionInterface`.
+2) Add it to the corresponding `get*Actions()` list in `SeoAnalyzer`.
+
 ## What It Returns
 
 The package returns a JSON API response with this structure:
@@ -97,8 +108,8 @@ The package returns a JSON API response with this structure:
         }
     },
     "categories": {
-        "seo": ["title", "title_optimal_length", "meta_description", "meta_description_optimal_length", "headings", "content_keywords", "keyword_consistency", "image_keywords", "seo_friendly_url", "canonical_tag", "hreflang", "404_page", "robots", "noindex", "noindex_header", "in_page_links", "nofollow_links", "link_url_readability", "language", "favicon"],
-        "performance": ["text_compression", "load_time", "page_size", "http_requests", "image_format", "defer_javascript", "minification", "dom_size", "doctype"],
+        "seo": ["title", "title_optimal_length", "meta_description", "meta_description_optimal_length", "headings", "h1_usage", "header_tag_usage", "content_keywords", "keyword_consistency", "image_keywords", "open_graph", "twitter_cards", "seo_friendly_url", "canonical_tag", "canonical_self_reference", "hreflang", "404_page", "robots", "noindex", "robots_directives", "noindex_header", "in_page_links", "nofollow_links", "link_url_readability", "language", "favicon"],
+        "performance": ["text_compression", "brotli_compression", "load_time", "ttfb", "page_size", "http_requests", "static_cache_headers", "expires_headers", "avoid_redirects", "redirect_chains", "cookie_free_domains", "empty_src_or_href", "image_format", "image_dimensions", "image_lazy_loading", "image_size_optimization", "lcp_proxy", "cls_proxy", "defer_javascript", "render_blocking_resources", "minification", "dom_size", "doctype"],
         "security": ["https_encryption", "http2", "mixed_content", "server_signature", "unsafe_cross_origin_links", "htst", "plaintext_email"],
         "miscellaneous": ["structured_data", "meta_viewport", "charset", "sitemap", "social", "content_length", "text_html_ratio", "inline_css", "deprecated_html_tags", "llms_txt", "flash_content", "iframes"],
         "technology": ["server_ip", "dns_servers", "dmarc_record", "spf_record", "ssl_certificate", "reverse_dns", "analytics", "technology_detection"]
@@ -119,6 +130,7 @@ Each check in `results` has:
 - `title` - Page title (string)
 - `meta_description` - Meta description (string)
 - `headings` - All headings h1-h6 (array)
+- `header_tag_usage` - H2-H6 heading counts and usage (array)
 - `load_time` - Page load time in seconds (float)
 - `page_size` - HTML size in bytes (int)
 - `https_encryption` - Whether HTTPS is used (bool via passed)
@@ -283,12 +295,13 @@ $report->save();
 
 ## All Available Checks
 
-### SEO (19 checks)
+### SEO (20 checks)
 - `title` - Page title tag
 - `title_optimal_length` - Title optimal length (50-60 chars)
 - `meta_description` - Meta description tag
 - `meta_description_optimal_length` - Meta description optimal length (120-160 chars)
 - `headings` - H1-H6 headings structure
+- `header_tag_usage` - H2-H6 heading tag usage counts
 - `content_keywords` - Keywords in title vs content
 - `keyword_consistency` - Keyword distribution across title, meta description, headings
 - `image_keywords` - Images with missing alt attributes

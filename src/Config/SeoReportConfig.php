@@ -98,6 +98,21 @@ final readonly class SeoReportConfig
         return (string) ($this->options['report_limit_image_formats'] ?? "AVIF\nWebP");
     }
 
+    public function getReportLimitImageMaxBytes(): int
+    {
+        return (int) ($this->options['report_limit_image_max_bytes'] ?? 200000);
+    }
+
+    public function getReportLimitTtfb(): float
+    {
+        return (float) ($this->options['report_limit_ttfb'] ?? 0.8);
+    }
+
+    public function getReportLimitLcpProxyBytes(): int
+    {
+        return (int) ($this->options['report_limit_lcp_proxy_bytes'] ?? 400000);
+    }
+
     public function getReportLimitDeprecatedHtmlTags(): string
     {
         return (string) ($this->options['report_limit_deprecated_html_tags'] ?? "acronym\napplet\nbasefont\nbig\ncenter\ndir\nfont\nframe\nframeset\nisindex\nnoframes\ns\nstrike\ntt\nu");

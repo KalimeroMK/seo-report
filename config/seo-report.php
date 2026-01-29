@@ -24,6 +24,9 @@ return [
     'report_limit_http_requests' => 50,
     'report_limit_max_dom_nodes' => 1500,
     'report_limit_image_formats' => "AVIF\nWebP",
+    'report_limit_image_max_bytes' => 200000,
+    'report_limit_ttfb' => 0.8,
+    'report_limit_lcp_proxy_bytes' => 400000,
     'report_limit_deprecated_html_tags' => "acronym\napplet\nbasefont\nbig\ncenter\ndir\nfont\nframe\nframeset\nisindex\nnoframes\ns\nstrike\ntt\nu",
 
     'report_score_high' => 10,

@@ -19,7 +19,26 @@ final class AnalysisResultTest extends TestCase
         $this->assertArrayHasKey('miscellaneous', AnalysisResult::CATEGORIES);
         $this->assertContains('title', AnalysisResult::CATEGORIES['seo']);
         $this->assertContains('meta_description', AnalysisResult::CATEGORIES['seo']);
+        $this->assertContains('open_graph', AnalysisResult::CATEGORIES['seo']);
+        $this->assertContains('twitter_cards', AnalysisResult::CATEGORIES['seo']);
+        $this->assertContains('canonical_self_reference', AnalysisResult::CATEGORIES['seo']);
+        $this->assertContains('robots_directives', AnalysisResult::CATEGORIES['seo']);
+        $this->assertContains('h1_usage', AnalysisResult::CATEGORIES['seo']);
         $this->assertContains('https_encryption', AnalysisResult::CATEGORIES['security']);
+        $this->assertContains('expires_headers', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('avoid_redirects', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('cookie_free_domains', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('empty_src_or_href', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('static_cache_headers', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('brotli_compression', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('render_blocking_resources', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('image_dimensions', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('image_lazy_loading', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('image_size_optimization', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('redirect_chains', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('ttfb', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('lcp_proxy', AnalysisResult::CATEGORIES['performance']);
+        $this->assertContains('cls_proxy', AnalysisResult::CATEGORIES['performance']);
     }
 
     #[Test]

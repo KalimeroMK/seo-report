@@ -8,11 +8,78 @@ use GuzzleHttp\Client as HttpClient;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\TransferStats;
+use KalimeroMK\SeoReport\Actions\AnalysisContext;
+use KalimeroMK\SeoReport\Actions\Performance\CacheHeadersAction;
+use KalimeroMK\SeoReport\Actions\Performance\CompressionAction;
+use KalimeroMK\SeoReport\Actions\Performance\CookieFreeDomainsAction;
+use KalimeroMK\SeoReport\Actions\Performance\DeferJavascriptAction;
+use KalimeroMK\SeoReport\Actions\Performance\DoctypeAction;
+use KalimeroMK\SeoReport\Actions\Performance\DomSizeAction;
+use KalimeroMK\SeoReport\Actions\Performance\EmptySrcHrefAction;
+use KalimeroMK\SeoReport\Actions\Performance\HttpRequestsAction;
+use KalimeroMK\SeoReport\Actions\Performance\ImageOptimizationAction;
+use KalimeroMK\SeoReport\Actions\Performance\MinificationAction;
+use KalimeroMK\SeoReport\Actions\Performance\PageSizeAction;
+use KalimeroMK\SeoReport\Actions\Performance\RedirectsAction;
+use KalimeroMK\SeoReport\Actions\Performance\RenderBlockingResourcesAction;
+use KalimeroMK\SeoReport\Actions\Performance\TimingAction;
+use KalimeroMK\SeoReport\Actions\Security\Http2Action;
+use KalimeroMK\SeoReport\Actions\Security\HttpsEncryptionAction;
+use KalimeroMK\SeoReport\Actions\Security\HstsAction;
+use KalimeroMK\SeoReport\Actions\Security\MixedContentAction;
+use KalimeroMK\SeoReport\Actions\Security\PlaintextEmailAction;
+use KalimeroMK\SeoReport\Actions\Security\ServerSignatureAction;
+use KalimeroMK\SeoReport\Actions\Security\UnsafeCrossOriginLinksAction;
+use KalimeroMK\SeoReport\Actions\Misc\CharsetAction;
+use KalimeroMK\SeoReport\Actions\Misc\ContentLengthAction;
+use KalimeroMK\SeoReport\Actions\Misc\DeprecatedHtmlTagsAction;
+use KalimeroMK\SeoReport\Actions\Misc\FlashContentAction;
+use KalimeroMK\SeoReport\Actions\Misc\IframesAction;
+use KalimeroMK\SeoReport\Actions\Misc\InlineCssAction;
+use KalimeroMK\SeoReport\Actions\Misc\LlmsTxtAction;
+use KalimeroMK\SeoReport\Actions\Misc\MetaViewportAction;
+use KalimeroMK\SeoReport\Actions\Misc\SitemapAction;
+use KalimeroMK\SeoReport\Actions\Misc\SocialLinksAction;
+use KalimeroMK\SeoReport\Actions\Misc\StructuredDataAction;
+use KalimeroMK\SeoReport\Actions\Misc\TextHtmlRatioAction;
+use KalimeroMK\SeoReport\Actions\Seo\CanonicalAction;
+use KalimeroMK\SeoReport\Actions\Technology\AnalyticsAction;
+use KalimeroMK\SeoReport\Actions\Technology\DmarcRecordAction;
+use KalimeroMK\SeoReport\Actions\Technology\DnsServersAction;
+use KalimeroMK\SeoReport\Actions\Technology\ReverseDnsAction;
+use KalimeroMK\SeoReport\Actions\Technology\ServerIpAction;
+use KalimeroMK\SeoReport\Actions\Technology\SpfRecordAction;
+use KalimeroMK\SeoReport\Actions\Technology\SslCertificateAction;
+use KalimeroMK\SeoReport\Actions\Technology\TechnologyDetectionAction;
+use KalimeroMK\SeoReport\Actions\Seo\ContentKeywordsAction;
+use KalimeroMK\SeoReport\Actions\Seo\FaviconAction;
+use KalimeroMK\SeoReport\Actions\Seo\HeadingsAction;
+use KalimeroMK\SeoReport\Actions\Seo\HreflangAction;
+use KalimeroMK\SeoReport\Actions\Seo\ImageKeywordsAction;
+use KalimeroMK\SeoReport\Actions\Seo\InPageLinksAction;
+use KalimeroMK\SeoReport\Actions\Seo\LanguageAction;
+use KalimeroMK\SeoReport\Actions\Seo\LinkUrlReadabilityAction;
+use KalimeroMK\SeoReport\Actions\Seo\MetaDescriptionAction;
+use KalimeroMK\SeoReport\Actions\Seo\NofollowLinksAction;
+use KalimeroMK\SeoReport\Actions\Seo\NoindexHeaderAction;
+use KalimeroMK\SeoReport\Actions\Seo\NotFoundAction;
+use KalimeroMK\SeoReport\Actions\Seo\OpenGraphAction;
+use KalimeroMK\SeoReport\Actions\Seo\RobotsAction;
+use KalimeroMK\SeoReport\Actions\Seo\SeoFriendlyUrlAction;
+use KalimeroMK\SeoReport\Actions\Seo\TitleAction;
+use KalimeroMK\SeoReport\Actions\Seo\TwitterCardsAction;
 use KalimeroMK\SeoReport\Config\SeoReportConfig;
 use KalimeroMK\SeoReport\Dto\AnalysisResult;
+use KalimeroMK\SeoReport\Support\UrlHelperTrait;
 
 final class SeoAnalyzer
 {
+    use UrlHelperTrait {
+        resolveUrl as private resolveUrlWithBase;
+        isInternalUrl as private isInternalUrlWithBase;
+        normalizeUrlForCanonical as private normalizeUrlForCanonicalInternal;
+    }
+
     private ?string $url = null;
 
     private string|false|null $cachedNotFoundPage = null;
@@ -62,7 +129,7 @@ final class SeoAnalyzer
      */
     public function analyzeSitemap(string $sitemapUrl, ?int $maxLinks = null): array
     {
-        $maxLinks = $maxLinks ?? $this->config->getSitemapLinks();
+        $maxLinks ??= $this->config->getSitemapLinks();
         if (ini_get('max_execution_time') > 0 && $maxLinks > 0) {
             $extra = $maxLinks * $this->config->getRequestTimeout();
             ini_set('max_execution_time', (string) ((int) ini_get('max_execution_time') + $extra));
@@ -133,7 +200,7 @@ final class SeoAnalyzer
                     'track_redirects' => true,
                 ],
                 'headers' => [
-                    'Accept-Encoding' => 'gzip, deflate',
+                    'Accept-Encoding' => 'gzip, deflate, br',
                     'User-Agent' => $this->config->getRequestUserAgent(),
                 ],
                 'on_stats' => function (TransferStats $stats) use (&$reportRequestStats): void {
@@ -146,12 +213,13 @@ final class SeoAnalyzer
             return null;
         }
 
-        $reportRequestStats = $reportRequestStats ?? [];
+        $reportRequestStats ??= [];
         if (isset($reportRequestStats['url'])) {
             $reportRequestStats['url'] = (string) $reportRequestStats['url'];
         }
         $reportRequestStats['total_time'] = (float) ($reportRequestStats['total_time'] ?? 0);
         $reportRequestStats['size_download'] = (float) ($reportRequestStats['size_download'] ?? 0);
+        $reportRequestStats['starttransfer_time'] = (float) ($reportRequestStats['starttransfer_time'] ?? 0);
 
         return [
             'response' => $request,
@@ -178,8 +246,8 @@ final class SeoAnalyzer
 
         $bodyEl = $domDocument->getElementsByTagName('body')->item(0);
         $pageText = seo_report_clean_tag_text($bodyEl !== null ? $bodyEl->textContent : null);
-        $bodyKeywords = array_filter(explode(' ', (string) preg_replace('/[^\w]/ui', ' ', mb_strtolower($pageText))));
-        $docType = $domDocument->doctype !== null ? $domDocument->doctype->nodeName : '';
+        $bodyKeywords = array_values(array_filter(explode(' ', (string) preg_replace('/[^\w]/ui', ' ', mb_strtolower($pageText)))));
+        $docType = $domDocument->doctype instanceof \DOMDocumentType ? $domDocument->doctype->nodeName : '';
 
         $title = null;
         $titleTagsCount = 0;
@@ -205,12 +273,22 @@ final class SeoAnalyzer
                 $headings[$heading][] = seo_report_clean_tag_text($node->textContent);
             }
         }
+        $h1Count = isset($headings['h1']) ? count($headings['h1']) : 0;
+        $secondaryHeadingUsage = [];
+        $secondaryHeadingLevels = 0;
+        foreach (['h2', 'h3', 'h4', 'h5', 'h6'] as $heading) {
+            $count = isset($headings[$heading]) ? count($headings[$heading]) : 0;
+            $secondaryHeadingUsage[$heading] = $count;
+            if ($count > 0) {
+                $secondaryHeadingLevels++;
+            }
+        }
 
         $titleKeywords = array_filter(explode(' ', (string) preg_replace('/[^\w]/ui', ' ', mb_strtolower((string) $title))));
 
         $metaDescriptionKeywords = array_filter(explode(' ', (string) preg_replace('/[^\w]/ui', ' ', mb_strtolower((string) $metaDescription))));
         $headingTexts = [];
-        foreach ($headings as $level => $texts) {
+        foreach ($headings as $texts) {
             foreach ($texts as $t) {
                 $headingTexts[] = $t;
             }
@@ -263,7 +341,7 @@ final class SeoAnalyzer
 
         $httpScheme = parse_url($this->url, PHP_URL_SCHEME);
 
-        if (!isset($this->cachedNotFoundPage)) {
+        if ($this->cachedNotFoundPage === null) {
             $notFoundPage = false;
             $notFoundUrl = parse_url($this->url, PHP_URL_SCHEME) . '://' . parse_url($this->url, PHP_URL_HOST) . '/404-' . md5(uniqid((string) mt_rand(), true));
             try {
@@ -278,7 +356,7 @@ final class SeoAnalyzer
                 ]);
             } catch (RequestException $e) {
                 $response = $e->getResponse();
-                if ($response !== null && $response->getStatusCode() === 404) {
+                if ($response instanceof \Psr\Http\Message\ResponseInterface && $response->getStatusCode() === 404) {
                     $notFoundPage = $notFoundUrl;
                 }
             } catch (\Exception) {
@@ -291,7 +369,7 @@ final class SeoAnalyzer
         $sitemaps = [];
         $robotsRulesFailed = [];
         $robots = true;
-        if (!isset($this->cachedRobotsRequest)) {
+        if (!$this->cachedRobotsRequest instanceof \Psr\Http\Message\ResponseInterface) {
             $robotsUrl = parse_url($this->url, PHP_URL_SCHEME) . '://' . parse_url($this->url, PHP_URL_HOST) . '/robots.txt';
             try {
                 $hc = $this->httpClient ?? new HttpClient();
@@ -308,13 +386,13 @@ final class SeoAnalyzer
             }
         }
         $robotsRequest = $this->cachedRobotsRequest;
-        $robotsRules = $robotsRequest !== null
+        $robotsRules = $robotsRequest instanceof \Psr\Http\Message\ResponseInterface
             ? preg_split('/\n|\r/', $robotsRequest->getBody()->getContents(), -1, PREG_SPLIT_NO_EMPTY) ?: []
             : [];
         foreach ($robotsRules as $robotsRule) {
             $rule = explode(':', $robotsRule, 2);
             $directive = trim(strtolower($rule[0]));
-            $value = trim((string) ($rule[1] ?? ''));
+            $value = trim($rule[1] ?? '');
             if ($directive === 'disallow' && $value !== '' && preg_match($this->formatRobotsRule($value), $this->url)) {
                 $robotsRulesFailed[] = $value;
                 $robots = false;
@@ -325,10 +403,20 @@ final class SeoAnalyzer
         }
 
         $noIndex = null;
+        $robotsDirectives = [];
         foreach ($domDocument->getElementsByTagName('head') as $headNode) {
             foreach ($headNode->getElementsByTagName('meta') as $node) {
-                if ((strtolower($node->getAttribute('name')) === 'robots' || strtolower($node->getAttribute('name')) === 'googlebot') && preg_match('/\bnoindex\b/', $node->getAttribute('content'))) {
-                    $noIndex = $node->getAttribute('content');
+                $metaName = strtolower($node->getAttribute('name'));
+                if ($metaName !== 'robots' && $metaName !== 'googlebot') {
+                    continue;
+                }
+                $content = trim($node->getAttribute('content'));
+                if ($content === '') {
+                    continue;
+                }
+                $robotsDirectives = array_merge($robotsDirectives, array_map(trim(...), explode(',', strtolower($content))));
+                if (preg_match('/\bnoindex\b/', $content)) {
+                    $noIndex = $content;
                 }
             }
         }
@@ -350,12 +438,17 @@ final class SeoAnalyzer
         }
 
         $canonicalTag = null;
+        $canonicalTags = [];
         $hreflang = [];
         foreach ($domDocument->getElementsByTagName('head') as $headNode) {
             foreach ($headNode->getElementsByTagName('link') as $node) {
                 $rel = strtolower($node->getAttribute('rel'));
                 if ($rel === 'canonical' && $node->getAttribute('href') !== '') {
-                    $canonicalTag = $this->resolveUrl($node->getAttribute('href'));
+                    $canonical = $this->resolveUrl($node->getAttribute('href'));
+                    $canonicalTags[] = $canonical;
+                    if ($canonicalTag === null) {
+                        $canonicalTag = $canonical;
+                    }
                 }
                 if ($rel === 'alternate' && $node->getAttribute('hreflang') !== '') {
                     $hreflang[] = [
@@ -392,17 +485,15 @@ final class SeoAnalyzer
 
         $unsafeCrossOriginLinks = [];
         foreach ($domDocument->getElementsByTagName('a') as $node) {
-            if (!$this->isInternalUrl($this->resolveUrl($node->getAttribute('href'))) && $node->getAttribute('target') === '_blank') {
-                if (!str_contains(strtolower($node->getAttribute('rel')), 'noopener') && !str_contains(strtolower($node->getAttribute('rel')), 'nofollow')) {
-                    $unsafeCrossOriginLinks[] = $this->resolveUrl($node->getAttribute('href'));
-                }
+            if (!$this->isInternalUrl($this->resolveUrl($node->getAttribute('href'))) && $node->getAttribute('target') === '_blank' && (!str_contains(strtolower($node->getAttribute('rel')), 'noopener') && !str_contains(strtolower($node->getAttribute('rel')), 'nofollow'))) {
+                $unsafeCrossOriginLinks[] = $this->resolveUrl($node->getAttribute('href'));
             }
         }
 
         preg_match_all('/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i', $reportResponse, $plaintextEmailsRaw, PREG_UNMATCHED_AS_NULL);
-        $rawEmails = $plaintextEmailsRaw[0] ?? [];
+        $rawEmails = $plaintextEmailsRaw[0];
         $plaintextEmails = array_values(array_filter(
-            is_array($rawEmails) ? $rawEmails : [],
+            $rawEmails,
             fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false
         ));
 
@@ -430,14 +521,56 @@ final class SeoAnalyzer
             }
         }
 
+        $emptySrcHref = [];
+        $srcHrefTags = [
+            ['tag' => 'img', 'attr' => 'src'],
+            ['tag' => 'script', 'attr' => 'src'],
+            ['tag' => 'iframe', 'attr' => 'src'],
+            ['tag' => 'link', 'attr' => 'href'],
+            ['tag' => 'a', 'attr' => 'href'],
+        ];
+        foreach ($srcHrefTags as $spec) {
+            foreach ($domDocument->getElementsByTagName($spec['tag']) as $node) {
+                if (!$node->hasAttribute($spec['attr'])) {
+                    continue;
+                }
+                $value = trim($node->getAttribute($spec['attr']));
+                if ($value === '' || $value === '0') {
+                    $emptySrcHref[] = $spec['tag'] . '[' . $spec['attr'] . ']';
+                }
+            }
+        }
+
         $imageFormatsConfig = preg_split('/\n|\r/', $this->config->getReportLimitImageFormats(), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $allowedExtensions = array_map('strtolower', $imageFormatsConfig);
+        $allowedExtensions = array_map(strtolower(...), $imageFormatsConfig);
         $imageFormats = [];
+        $imagesMissingDimensions = [];
+        $imagesMissingLazy = [];
+        $imageUrls = [];
         foreach ($domDocument->getElementsByTagName('img') as $node) {
             if (empty($node->getAttribute('src'))) {
                 continue;
             }
             $imgUrl = $this->resolveUrl($node->getAttribute('src'));
+            $imageUrls[] = $imgUrl;
+            $missing = [];
+            $width = trim($node->getAttribute('width'));
+            $height = trim($node->getAttribute('height'));
+            if ($width === '' || $width === '0') {
+                $missing[] = 'width';
+            }
+            if ($height === '' || $height === '0') {
+                $missing[] = 'height';
+            }
+            if ($missing !== []) {
+                $imagesMissingDimensions[] = ['url' => $imgUrl, 'missing' => $missing];
+            }
+
+            $loading = trim(mb_strtolower($node->getAttribute('loading')));
+            if ($loading !== 'lazy') {
+                $imagesMissingLazy[] = $imgUrl;
+            }
+
             $ext = mb_strtolower(pathinfo($imgUrl, PATHINFO_EXTENSION));
             if ($ext === 'svg' || in_array($ext, $allowedExtensions, true)) {
                 continue;
@@ -452,6 +585,29 @@ final class SeoAnalyzer
         foreach ($domDocument->getElementsByTagName('script') as $node) {
             if ($node->getAttribute('src') && !$node->hasAttribute('defer')) {
                 $deferJavaScript[] = $this->resolveUrl($node->getAttribute('src'));
+            }
+        }
+
+        $renderBlocking = ['js' => [], 'css' => []];
+        foreach ($domDocument->getElementsByTagName('head') as $headNode) {
+            foreach ($headNode->getElementsByTagName('script') as $node) {
+                if ($node->getAttribute('src') && !$node->hasAttribute('defer') && !$node->hasAttribute('async')) {
+                    $renderBlocking['js'][] = $this->resolveUrl($node->getAttribute('src'));
+                }
+            }
+            foreach ($headNode->getElementsByTagName('link') as $node) {
+                if (!preg_match('/\bstylesheet\b/i', $node->getAttribute('rel'))) {
+                    continue;
+                }
+                $href = $node->getAttribute('href');
+                if ($href === '' || $href === '0') {
+                    continue;
+                }
+                $media = trim(mb_strtolower($node->getAttribute('media')));
+                if ($media !== '' && $media !== 'all') {
+                    continue;
+                }
+                $renderBlocking['css'][] = $this->resolveUrl($href);
             }
         }
 
@@ -476,6 +632,8 @@ final class SeoAnalyzer
                 }
             }
         }
+        $openGraphData = $structuredData['Open Graph'] ?? [];
+        $twitterData = $structuredData['Twitter'] ?? [];
 
         $metaViewport = null;
         foreach ($domDocument->getElementsByTagName('head') as $headNode) {
@@ -705,366 +863,290 @@ final class SeoAnalyzer
         $response = $urlRequest['response'];
 
         $data = ['results' => []];
-
-        $data['results']['title'] = ['passed' => true, 'importance' => 'high', 'value' => $title];
-        if (!$title) {
-            $data['results']['title']['passed'] = false;
-            $data['results']['title']['errors'] = ['missing' => null];
-        }
-        if (mb_strlen((string) $title) < $this->config->getReportLimitMinTitle() || mb_strlen((string) $title) > $this->config->getReportLimitMaxTitle()) {
-            $data['results']['title']['passed'] = false;
-            $data['results']['title']['errors'] = ['length' => ['min' => $this->config->getReportLimitMinTitle(), 'max' => $this->config->getReportLimitMaxTitle()]];
-        }
-        if ($titleTagsCount > 1) {
-            $data['results']['title']['passed'] = false;
-            $data['results']['title']['errors'] = ['too_many' => null];
-        }
-
-        $titleLength = mb_strlen((string) $title);
-        $data['results']['title_optimal_length'] = ['passed' => true, 'importance' => 'low', 'value' => $titleLength];
-        if ($titleLength < 50 || $titleLength > 60) {
-            $data['results']['title_optimal_length']['passed'] = false;
-            $data['results']['title_optimal_length']['errors'] = ['not_optimal' => ['optimal' => '50-60', 'current' => $titleLength]];
-        }
-
-        $data['results']['meta_description'] = ['passed' => true, 'importance' => 'high', 'value' => $metaDescription];
-        if (!$metaDescription) {
-            $data['results']['meta_description']['passed'] = false;
-            $data['results']['meta_description']['errors'] = ['missing' => null];
-        }
-
-        $metaDescriptionLength = mb_strlen((string) $metaDescription);
-        $data['results']['meta_description_optimal_length'] = ['passed' => true, 'importance' => 'low', 'value' => $metaDescriptionLength];
-        if ($metaDescription && ($metaDescriptionLength < 120 || $metaDescriptionLength > 160)) {
-            $data['results']['meta_description_optimal_length']['passed'] = false;
-            $data['results']['meta_description_optimal_length']['errors'] = ['not_optimal' => ['optimal' => '120-160', 'current' => $metaDescriptionLength]];
-        }
-
-        $data['results']['headings'] = ['passed' => true, 'importance' => 'high', 'value' => $headings];
-        if (!isset($headings['h1'])) {
-            $data['results']['headings']['passed'] = false;
-            $data['results']['headings']['errors'] = ['missing' => null];
-        }
-        if (isset($headings['h1']) && count($headings['h1']) > 1) {
-            $data['results']['headings']['passed'] = false;
-            $data['results']['headings']['errors'] = ['too_many' => null];
-        }
-        if (isset($headings['h1'][0]) && $headings['h1'][0] == $title) {
-            $data['results']['headings']['passed'] = false;
-            $data['results']['headings']['errors'] = ['duplicate' => null];
+        $seoData = [
+            'title' => $title,
+            'title_tags_count' => $titleTagsCount,
+            'meta_description' => $metaDescription,
+            'headings' => $headings,
+            'h1_count' => $h1Count,
+            'secondary_heading_usage' => $secondaryHeadingUsage,
+            'secondary_heading_levels' => $secondaryHeadingLevels,
+            'title_keywords' => array_values($titleKeywords),
+            'keyword_consistency' => $keywordConsistency,
+            'image_alts' => $imageAlts,
+            'page_links' => $pageLinks,
+            'unfriendly_link_urls' => $unfriendlyLinkUrls,
+            'nofollow_count' => $nofollowCount,
+            'nofollow_links' => $nofollowLinks,
+            'canonical_tag' => $canonicalTag,
+            'canonical_tags' => $canonicalTags,
+            'hreflang' => $hreflang,
+            'language' => $language,
+            'favicon' => $favicon,
+            'noindex' => $noIndex,
+            'robots_directives' => $robotsDirectives,
+            'robots' => $robots,
+            'robots_rules_failed' => $robotsRulesFailed,
+            'not_found_page' => $notFoundPage,
+            'noindex_header_value' => $noindexHeaderValue,
+            'open_graph_data' => $openGraphData,
+            'twitter_data' => $twitterData,
+            'current_url' => (string) ($stats['url'] ?? $this->url),
+        ];
+        $seoContext = $this->createContext(
+            $seoData,
+            $response,
+            $stats,
+            $domDocument,
+            $reportResponse,
+            $pageText,
+            $bodyKeywords,
+            $docType,
+            $inputUrl,
+        );
+        foreach ($this->getSeoActions() as $action) {
+            $data['results'] = array_merge($data['results'], $action->handle($seoContext));
         }
 
-        $data['results']['content_keywords'] = ['passed' => true, 'importance' => 'high', 'value' => array_intersect($titleKeywords, $bodyKeywords)];
-        if (array_intersect($titleKeywords, $bodyKeywords) === []) {
-            $data['results']['content_keywords']['passed'] = false;
-            $data['results']['content_keywords']['errors'] = ['missing' => $titleKeywords];
-        }
-
-        $data['results']['keyword_consistency'] = ['passed' => true, 'importance' => 'medium', 'value' => $keywordConsistency];
-        if ($titleKeywords !== []) {
-            $keywordConsistencyErrors = [];
-            if ($keywordsInMeta === []) {
-                $data['results']['keyword_consistency']['passed'] = false;
-                $keywordConsistencyErrors['no_title_keywords_in_meta'] = $keywordsMissingInMeta;
+        $assetHeadCache = [];
+        $fetchAssetHead = function (string $assetUrl) use (&$assetHeadCache): ?\Psr\Http\Message\ResponseInterface {
+            if (array_key_exists($assetUrl, $assetHeadCache)) {
+                return $assetHeadCache[$assetUrl];
             }
-            if ($keywordsInHeadings === []) {
-                $data['results']['keyword_consistency']['passed'] = false;
-                $keywordConsistencyErrors['no_title_keywords_in_headings'] = $keywordsMissingInHeadings;
+            $assetHeadCache[$assetUrl] = $this->fetchAssetResponse($assetUrl);
+            return $assetHeadCache[$assetUrl];
+        };
+
+        $staticAssets = array_unique(array_merge(
+            $httpRequests['JavaScripts'],
+            $httpRequests['CSS'],
+            $httpRequests['Images'],
+        ));
+        $missingStaticCache = [];
+        $checkedStaticAssets = [];
+        foreach ($staticAssets as $assetUrl) {
+            if (preg_match('/^data:/i', $assetUrl)) {
+                continue;
             }
-            if ($keywordConsistencyErrors !== []) {
-                $data['results']['keyword_consistency']['errors'] = $keywordConsistencyErrors;
+            $scheme = parse_url($assetUrl, PHP_URL_SCHEME);
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                continue;
+            }
+            $assetResponse = $fetchAssetHead($assetUrl);
+            if (!$assetResponse instanceof \Psr\Http\Message\ResponseInterface || $assetResponse->getStatusCode() >= 400) {
+                continue;
+            }
+            $checkedStaticAssets[] = $assetUrl;
+            $assetCacheControl = $assetResponse->getHeaderLine('Cache-Control');
+            $assetExpires = $assetResponse->getHeaderLine('Expires');
+            $hasMaxAge = (bool) preg_match('/(?:^|,)\s*(?:s-maxage|max-age)=\d+/i', $assetCacheControl);
+            if ($assetExpires === '' && !$hasMaxAge) {
+                $missingStaticCache[] = $assetUrl;
+            }
+        }
+        $maxImageBytes = $this->config->getReportLimitImageMaxBytes();
+        $largeImages = [];
+        $checkedImages = [];
+        $largestImage = null;
+        if ($maxImageBytes > 0) {
+            foreach (array_unique($imageUrls) as $imgUrl) {
+                if (preg_match('/^data:/i', $imgUrl)) {
+                    continue;
+                }
+                $scheme = parse_url($imgUrl, PHP_URL_SCHEME);
+                if (!in_array($scheme, ['http', 'https'], true)) {
+                    continue;
+                }
+                $assetResponse = $fetchAssetHead($imgUrl);
+                if (!$assetResponse instanceof \Psr\Http\Message\ResponseInterface || $assetResponse->getStatusCode() >= 400) {
+                    continue;
+                }
+                $checkedImages[] = $imgUrl;
+                $contentLength = (int) $assetResponse->getHeaderLine('Content-Length');
+                if ($contentLength > 0 && ($largestImage === null || $contentLength > $largestImage['bytes'])) {
+                    $largestImage = ['url' => $imgUrl, 'bytes' => $contentLength];
+                }
+                if ($contentLength > 0 && $contentLength > $maxImageBytes) {
+                    $largeImages[] = ['url' => $imgUrl, 'bytes' => $contentLength];
+                }
             }
         }
 
-        $data['results']['image_keywords'] = ['passed' => true, 'importance' => 'high', 'value' => null];
-        if ($imageAlts !== []) {
-            $data['results']['image_keywords']['passed'] = false;
-            $data['results']['image_keywords']['errors'] = ['missing' => $imageAlts];
+        $assetRedirects = [];
+        foreach ($staticAssets as $assetUrl) {
+            if (preg_match('/^data:/i', $assetUrl)) {
+                continue;
+            }
+            $scheme = parse_url($assetUrl, PHP_URL_SCHEME);
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                continue;
+            }
+            $assetResponse = $fetchAssetHead($assetUrl);
+            if (!$assetResponse instanceof \Psr\Http\Message\ResponseInterface || $assetResponse->getStatusCode() >= 400) {
+                continue;
+            }
+            $history = $assetResponse->getHeader('X-Guzzle-Redirect-History');
+            $count = count($history);
+            if ($count > 0) {
+                $assetRedirects[] = ['url' => $assetUrl, 'count' => $count];
+            }
+        }
+        $redirectCount = (int) ($stats['redirect_count'] ?? 0);
+        $redirectHistory = $response->getHeader('X-Guzzle-Redirect-History');
+        $redirectHistoryCount = count($redirectHistory);
+        if ($redirectHistoryCount > $redirectCount) {
+            $redirectCount = $redirectHistoryCount;
         }
 
-        $data['results']['image_format'] = ['passed' => true, 'importance' => 'medium', 'value' => $imageFormatsConfig];
-        if ($imageFormats !== []) {
-            $data['results']['image_format']['passed'] = false;
-            $data['results']['image_format']['errors'] = ['bad_format' => $imageFormats];
+        $mainHost = strtolower((string) (parse_url((string) ($stats['url'] ?? $this->url), PHP_URL_HOST) ?? ''));
+        $setCookieHeaders = $response->getHeader('Set-Cookie');
+        $cookieDomainHits = [];
+        if ($mainHost !== '' && $setCookieHeaders !== []) {
+            foreach ($httpRequests as $requests) {
+                foreach ($requests as $assetUrl) {
+                    $assetHost = strtolower((string) (parse_url($assetUrl, PHP_URL_HOST) ?? ''));
+                    if ($assetHost !== '' && $assetHost === $mainHost) {
+                        $cookieDomainHits[] = $assetUrl;
+                    }
+                }
+            }
         }
 
-        $data['results']['in_page_links'] = ['passed' => true, 'importance' => 'medium', 'value' => $pageLinks];
-        if (array_sum(array_map('count', $pageLinks)) > $this->config->getReportLimitMaxLinks()) {
-            $data['results']['in_page_links']['passed'] = false;
-            $data['results']['in_page_links']['errors'] = ['too_many' => ['max' => $this->config->getReportLimitMaxLinks()]];
-        }
-
-        $data['results']['link_url_readability'] = ['passed' => true, 'importance' => 'low', 'value' => null];
-        if ($unfriendlyLinkUrls !== []) {
-            $data['results']['link_url_readability']['passed'] = false;
-            $data['results']['link_url_readability']['errors'] = ['unfriendly_urls' => $unfriendlyLinkUrls];
-        }
-
-        $data['results']['load_time'] = ['passed' => true, 'importance' => 'medium', 'value' => $stats['total_time']];
-        if ($stats['total_time'] > $this->config->getReportLimitLoadTime()) {
-            $data['results']['load_time']['passed'] = false;
-            $data['results']['load_time']['errors'] = ['too_slow' => ['max' => $this->config->getReportLimitLoadTime()]];
-        }
-
-        $data['results']['page_size'] = ['passed' => true, 'importance' => 'medium', 'value' => $stats['size_download']];
-        if ($stats['size_download'] > $this->config->getReportLimitPageSize()) {
-            $data['results']['page_size']['passed'] = false;
-            $data['results']['page_size']['errors'] = ['too_large' => ['max' => $this->config->getReportLimitPageSize()]];
-        }
-
-        $data['results']['http_requests'] = ['passed' => true, 'importance' => 'medium', 'value' => $httpRequests];
-        if (array_sum(array_map('count', $httpRequests)) > $this->config->getReportLimitHttpRequests()) {
-            $data['results']['http_requests']['passed'] = false;
-            $data['results']['http_requests']['errors'] = ['too_many' => ['max' => $this->config->getReportLimitHttpRequests()]];
-        }
-
-        $data['results']['defer_javascript'] = ['passed' => true, 'importance' => 'low', 'value' => null];
-        if ($deferJavaScript !== []) {
-            $data['results']['defer_javascript']['passed'] = false;
-            $data['results']['defer_javascript']['errors'] = ['missing' => $deferJavaScript];
-        }
-
-        $data['results']['dom_size'] = ['passed' => true, 'importance' => 'low', 'value' => $domNodesCount];
-        if ($domNodesCount > $this->config->getReportLimitMaxDomNodes()) {
-            $data['results']['dom_size']['passed'] = false;
-            $data['results']['dom_size']['errors'] = ['too_many' => ['max' => $this->config->getReportLimitMaxDomNodes()]];
-        }
-
-        $data['results']['doctype'] = ['passed' => true, 'importance' => 'medium', 'value' => $docType];
-        if ($docType === '' || $docType === '0') {
-            $data['results']['doctype']['passed'] = false;
-            $data['results']['doctype']['errors'] = ['missing' => null];
-        }
+        $cacheControl = $response->getHeaderLine('Cache-Control');
+        $expires = $response->getHeaderLine('Expires');
+        $hasMaxAge = (bool) preg_match('/(?:^|,)\s*(?:s-maxage|max-age)=\d+/i', $cacheControl);
 
         $encHeader = $response->getHeader('Content-Encoding');
-        $data['results']['text_compression'] = ['passed' => true, 'importance' => 'high', 'value' => $stats['size_download']];
-        if (!in_array('gzip', $encHeader, true)) {
-            $data['results']['text_compression']['passed'] = false;
-            $data['results']['text_compression']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['structured_data'] = ['passed' => true, 'importance' => 'medium', 'value' => $structuredData];
-        if ($structuredData === []) {
-            $data['results']['structured_data']['passed'] = false;
-            $data['results']['structured_data']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['meta_viewport'] = ['passed' => true, 'importance' => 'medium', 'value' => $metaViewport];
-        if (!$metaViewport) {
-            $data['results']['meta_viewport']['passed'] = false;
-            $data['results']['meta_viewport']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['https_encryption'] = ['passed' => true, 'importance' => 'high', 'value' => $stats['url'] ?? $this->url];
-        if (strtolower((string) $httpScheme) !== 'https') {
-            $data['results']['https_encryption']['passed'] = false;
-            $data['results']['https_encryption']['errors'] = ['missing' => 'https'];
-        }
-
-        $data['results']['seo_friendly_url'] = ['passed' => true, 'importance' => 'high', 'value' => $stats['url'] ?? $this->url];
-        if (preg_match('/[\?\=\_\%\,\ ]/ui', (string) ($stats['url'] ?? $this->url))) {
-            $data['results']['seo_friendly_url']['passed'] = false;
-            $data['results']['seo_friendly_url']['errors'] = ['bad_format' => null];
-        }
-        if (array_filter($titleKeywords, fn ($k) => str_contains(mb_strtolower($this->url), mb_strtolower((string) $k))) === []) {
-            $data['results']['seo_friendly_url']['passed'] = false;
-            $data['results']['seo_friendly_url']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['language'] = ['passed' => true, 'importance' => 'medium', 'value' => $language];
-        if (!$language) {
-            $data['results']['language']['passed'] = false;
-            $data['results']['language']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['favicon'] = ['passed' => true, 'importance' => 'medium', 'value' => $favicon];
-        if (!$favicon) {
-            $data['results']['favicon']['passed'] = false;
-            $data['results']['favicon']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['content_length'] = ['passed' => true, 'importance' => 'low', 'value' => count($bodyKeywords)];
-        if (count($bodyKeywords) < $this->config->getReportLimitMinWords()) {
-            $data['results']['content_length']['passed'] = false;
-            $data['results']['content_length']['errors'] = ['too_few' => ['min' => $this->config->getReportLimitMinWords()]];
-        }
-
-        $data['results']['text_html_ratio'] = ['passed' => true, 'importance' => 'low', 'value' => $textRatio];
-        if ($textRatio < $this->config->getReportLimitMinTextRatio()) {
-            $data['results']['text_html_ratio']['passed'] = false;
-            $data['results']['text_html_ratio']['errors'] = ['too_small' => ['min' => $this->config->getReportLimitMinTextRatio()]];
-        }
-
-        $data['results']['charset'] = ['passed' => true, 'importance' => 'medium', 'value' => $charset];
-        if (!$charset) {
-            $data['results']['charset']['passed'] = false;
-            $data['results']['charset']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['deprecated_html_tags'] = ['passed' => true, 'importance' => 'low', 'value' => null];
-        if (count($deprecatedHtmlTags) > 1) {
-            $data['results']['deprecated_html_tags']['passed'] = false;
-            $data['results']['deprecated_html_tags']['errors'] = ['bad_tags' => $deprecatedHtmlTags];
-        }
-
-        $data['results']['404_page'] = ['passed' => true, 'importance' => 'high', 'value' => $notFoundPage];
-        if (!$notFoundPage) {
-            $data['results']['404_page']['passed'] = false;
-            $data['results']['404_page']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['noindex'] = ['passed' => true, 'importance' => 'high', 'value' => $noIndex];
-        if ($noIndex) {
-            $data['results']['noindex']['passed'] = false;
-            $data['results']['noindex']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['robots'] = ['passed' => true, 'importance' => 'high', 'value' => null];
-        if (!$robots) {
-            $data['results']['robots']['passed'] = false;
-            $data['results']['robots']['errors'] = ['failed' => $robotsRulesFailed];
-        }
-
-        $data['results']['sitemap'] = ['passed' => true, 'importance' => 'low', 'value' => $sitemaps];
-        if ($sitemaps === []) {
-            $data['results']['sitemap']['passed'] = false;
-            $data['results']['sitemap']['errors'] = ['failed' => null];
-        }
-
-        $data['results']['mixed_content'] = ['passed' => true, 'importance' => 'medium', 'value' => null];
-        if ($mixedContent !== []) {
-            $data['results']['mixed_content']['passed'] = false;
-            $data['results']['mixed_content']['errors'] = ['failed' => $mixedContent];
-        }
-
-        $serverHeader = $response->getHeader('Server');
-        $data['results']['server_signature'] = ['passed' => true, 'importance' => 'medium', 'value' => $serverHeader];
-        if ($serverHeader !== []) {
-            $data['results']['server_signature']['passed'] = false;
-            $data['results']['server_signature']['errors'] = ['failed' => null];
-        }
-
-        if ($this->config->getRequestHttpVersion() === '2') {
-            $data['results']['http2'] = ['passed' => true, 'importance' => 'medium', 'value' => $response->getProtocolVersion()];
-            if ($response->getProtocolVersion() !== '2') {
-                $data['results']['http2']['passed'] = false;
-                $data['results']['http2']['errors'] = ['failed' => null];
+        $encTokens = [];
+        foreach ($encHeader as $value) {
+            $parts = array_map(trim(...), explode(',', $value));
+            foreach ($parts as $part) {
+                if ($part !== '') {
+                    $encTokens[] = strtolower($part);
+                }
             }
         }
 
-        $htstHeader = $response->getHeader('Strict-Transport-Security');
-        $data['results']['htst'] = ['passed' => true, 'importance' => 'low', 'value' => $htstHeader];
-        if ($htstHeader === []) {
-            $data['results']['htst']['passed'] = false;
-            $data['results']['htst']['errors'] = ['missing' => null];
+        $performanceData = [
+            'http_requests' => $httpRequests,
+            'checked_static_assets' => $checkedStaticAssets,
+            'missing_static_cache' => $missingStaticCache,
+            'cache_control' => $cacheControl,
+            'expires_header' => $expires,
+            'has_max_age' => $hasMaxAge,
+            'redirect_count' => $redirectCount,
+            'redirect_history' => $redirectHistory,
+            'asset_redirects' => $assetRedirects,
+            'main_host' => $mainHost,
+            'cookie_domain_hits' => $cookieDomainHits,
+            'empty_src_or_href' => $emptySrcHref,
+            'image_formats_config' => $imageFormatsConfig,
+            'image_formats' => $imageFormats,
+            'images_missing_dimensions' => $imagesMissingDimensions,
+            'images_missing_lazy' => $imagesMissingLazy,
+            'image_max_bytes' => $maxImageBytes,
+            'large_images' => $largeImages,
+            'largest_image' => $largestImage,
+            'defer_javascript' => $deferJavaScript,
+            'render_blocking' => $renderBlocking,
+            'dom_nodes_count' => $domNodesCount,
+            'doc_type' => $docType,
+            'enc_tokens' => $encTokens,
+            'non_minified_js' => $nonMinifiedJs,
+            'non_minified_css' => $nonMinifiedCss,
+        ];
+        $performanceContext = $this->createContext(
+            $performanceData,
+            $response,
+            $stats,
+            $domDocument,
+            $reportResponse,
+            $pageText,
+            $bodyKeywords,
+            $docType,
+            $inputUrl,
+        );
+        foreach ($this->getPerformanceActions() as $action) {
+            $data['results'] = array_merge($data['results'], $action->handle($performanceContext));
         }
 
-        $data['results']['unsafe_cross_origin_links'] = ['passed' => true, 'importance' => 'medium', 'value' => null];
-        if ($unsafeCrossOriginLinks !== []) {
-            $data['results']['unsafe_cross_origin_links']['passed'] = false;
-            $data['results']['unsafe_cross_origin_links']['errors'] = ['failed' => $unsafeCrossOriginLinks];
+        $securityData = [
+            'http_scheme' => $httpScheme,
+            'mixed_content' => $mixedContent,
+            'server_header' => $response->getHeader('Server'),
+            'unsafe_cross_origin_links' => $unsafeCrossOriginLinks,
+            'hsts_header' => $response->getHeader('Strict-Transport-Security'),
+            'plaintext_emails' => $plaintextEmails,
+        ];
+        $securityContext = $this->createContext(
+            $securityData,
+            $response,
+            $stats,
+            $domDocument,
+            $reportResponse,
+            $pageText,
+            $bodyKeywords,
+            $docType,
+            $inputUrl,
+        );
+        foreach ($this->getSecurityActions() as $action) {
+            $data['results'] = array_merge($data['results'], $action->handle($securityContext));
         }
 
-        $data['results']['plaintext_email'] = ['passed' => true, 'importance' => 'low', 'value' => null];
-        if ($plaintextEmails !== []) {
-            $data['results']['plaintext_email']['passed'] = false;
-            $data['results']['plaintext_email']['errors'] = ['failed' => $plaintextEmails];
+        $miscData = [
+            'structured_data' => $structuredData,
+            'meta_viewport' => $metaViewport,
+            'charset' => $charset,
+            'sitemaps' => $sitemaps,
+            'social' => $social,
+            'text_ratio' => $textRatio,
+            'inline_css' => $inlineCss,
+            'deprecated_html_tags' => $deprecatedHtmlTags,
+            'llms_txt_url' => $llmsTxtUrl,
+            'flash_content' => $flashContent,
+            'iframes' => $iframes,
+        ];
+        $miscContext = $this->createContext(
+            $miscData,
+            $response,
+            $stats,
+            $domDocument,
+            $reportResponse,
+            $pageText,
+            $bodyKeywords,
+            $docType,
+            $inputUrl,
+        );
+        foreach ($this->getMiscActions() as $action) {
+            $data['results'] = array_merge($data['results'], $action->handle($miscContext));
         }
 
-        $data['results']['social'] = ['passed' => true, 'importance' => 'low', 'value' => $social];
-        if ($social === []) {
-            $data['results']['social']['passed'] = false;
-            $data['results']['social']['errors'] = ['missing' => null];
+        $technologyData = [
+            'host_str' => $hostStr,
+            'base_url' => $baseUrl,
+            'server_ip' => $serverIp,
+            'dns_servers' => $dnsServers,
+            'dmarc_record' => $dmarcRecord,
+            'spf_record' => $spfRecord,
+            'ssl_certificate' => $sslCertificate,
+            'reverse_dns' => $reverseDns,
+            'analytics_detected' => $analyticsDetected,
+            'technology_detected' => $technologyDetected,
+        ];
+        $technologyContext = $this->createContext(
+            $technologyData,
+            $response,
+            $stats,
+            $domDocument,
+            $reportResponse,
+            $pageText,
+            $bodyKeywords,
+            $docType,
+            $inputUrl,
+        );
+        foreach ($this->getTechnologyActions() as $action) {
+            $data['results'] = array_merge($data['results'], $action->handle($technologyContext));
         }
-
-        $data['results']['inline_css'] = ['passed' => true, 'importance' => 'low', 'value' => null];
-        if (count($inlineCss) > 1) {
-            $data['results']['inline_css']['passed'] = false;
-            $data['results']['inline_css']['errors'] = ['failed' => $inlineCss];
-        }
-
-        $data['results']['canonical_tag'] = ['passed' => true, 'importance' => 'medium', 'value' => $canonicalTag];
-        if ($canonicalTag === null) {
-            $data['results']['canonical_tag']['passed'] = false;
-            $data['results']['canonical_tag']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['hreflang'] = ['passed' => true, 'importance' => 'low', 'value' => $hreflang];
-        if ($hreflang === []) {
-            $data['results']['hreflang']['passed'] = false;
-            $data['results']['hreflang']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['noindex_header'] = ['passed' => true, 'importance' => 'high', 'value' => $noindexHeaderValue];
-        if ($noindexHeaderValue !== null && preg_match('/\bnoindex\b/i', $noindexHeaderValue)) {
-            $data['results']['noindex_header']['passed'] = false;
-            $data['results']['noindex_header']['errors'] = ['noindex' => $noindexHeaderValue];
-        }
-
-        $data['results']['server_ip'] = ['passed' => true, 'importance' => 'low', 'value' => $serverIp];
-        if ($serverIp === null && $hostStr !== '') {
-            $data['results']['server_ip']['passed'] = false;
-            $data['results']['server_ip']['errors'] = ['unresolved' => null];
-        }
-
-        $data['results']['dns_servers'] = ['passed' => true, 'importance' => 'low', 'value' => $dnsServers];
-        if ($dnsServers === [] && $hostStr !== '') {
-            $data['results']['dns_servers']['passed'] = false;
-            $data['results']['dns_servers']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['dmarc_record'] = ['passed' => true, 'importance' => 'low', 'value' => $dmarcRecord];
-        if ($dmarcRecord === null && $hostStr !== '') {
-            $data['results']['dmarc_record']['passed'] = false;
-            $data['results']['dmarc_record']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['spf_record'] = ['passed' => true, 'importance' => 'low', 'value' => $spfRecord];
-        if ($spfRecord === null && $hostStr !== '') {
-            $data['results']['spf_record']['passed'] = false;
-            $data['results']['spf_record']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['llms_txt'] = ['passed' => true, 'importance' => 'low', 'value' => $llmsTxtUrl];
-        if ($llmsTxtUrl === null) {
-            $data['results']['llms_txt']['passed'] = false;
-            $data['results']['llms_txt']['errors'] = ['missing' => null];
-        }
-
-        $data['results']['analytics'] = ['passed' => true, 'importance' => 'low', 'value' => array_keys($analyticsDetected)];
-
-        $data['results']['technology_detection'] = ['passed' => true, 'importance' => 'low', 'value' => array_keys($technologyDetected)];
-
-        $data['results']['minification'] = ['passed' => true, 'importance' => 'low', 'value' => ['js' => count($nonMinifiedJs), 'css' => count($nonMinifiedCss)]];
-        if ($nonMinifiedJs !== [] || $nonMinifiedCss !== []) {
-            $data['results']['minification']['passed'] = false;
-            $data['results']['minification']['errors'] = ['not_minified' => ['js' => $nonMinifiedJs, 'css' => $nonMinifiedCss]];
-        }
-
-        $data['results']['nofollow_links'] = ['passed' => true, 'importance' => 'low', 'value' => $nofollowCount];
-        if ($nofollowCount > 0) {
-            $data['results']['nofollow_links']['passed'] = false;
-            $data['results']['nofollow_links']['errors'] = ['found' => $nofollowLinks];
-        }
-
-        $data['results']['flash_content'] = ['passed' => true, 'importance' => 'low', 'value' => null];
-        if ($flashContent !== []) {
-            $data['results']['flash_content']['passed'] = false;
-            $data['results']['flash_content']['errors'] = ['found' => $flashContent];
-        }
-
-        $data['results']['iframes'] = ['passed' => true, 'importance' => 'low', 'value' => $iframes];
-
-        $data['results']['ssl_certificate'] = ['passed' => true, 'importance' => 'medium', 'value' => $sslCertificate];
-        if ($sslCertificate === null && $hostStr !== '' && str_starts_with($baseUrl, 'https://')) {
-            $data['results']['ssl_certificate']['passed'] = false;
-            $data['results']['ssl_certificate']['errors'] = ['unavailable' => null];
-        } elseif ($sslCertificate !== null && !($sslCertificate['valid'] ?? false)) {
-            $data['results']['ssl_certificate']['passed'] = false;
-            $data['results']['ssl_certificate']['errors'] = ['invalid_or_expired' => null];
-        }
-
-        $data['results']['reverse_dns'] = ['passed' => true, 'importance' => 'low', 'value' => $reverseDns];
 
         return $data;
     }
@@ -1077,7 +1159,7 @@ final class SeoAnalyzer
      */
     private function fetchSslCertificate(string $host): ?array
     {
-        $timeout = (int) min($this->config->getRequestTimeout(), 10);
+        $timeout = min($this->config->getRequestTimeout(), 10);
         $ctx = stream_context_create([
             'ssl' => [
                 'capture_peer_cert' => true,
@@ -1140,36 +1222,167 @@ final class SeoAnalyzer
         return $totalPoints > 0 ? (float) (($resultPoints / $totalPoints) * 100) : 0.0;
     }
 
+    /** @return list<\KalimeroMK\SeoReport\Actions\AnalysisActionInterface> */
+    private function getSeoActions(): array
+    {
+        return [
+            new TitleAction(),
+            new MetaDescriptionAction(),
+            new HeadingsAction(),
+            new ContentKeywordsAction(),
+            new ImageKeywordsAction(),
+            new InPageLinksAction(),
+            new LinkUrlReadabilityAction(),
+            new NofollowLinksAction(),
+            new OpenGraphAction(),
+            new TwitterCardsAction(),
+            new SeoFriendlyUrlAction(),
+            new CanonicalAction(),
+            new HreflangAction(),
+            new NotFoundAction(),
+            new RobotsAction(),
+            new NoindexHeaderAction(),
+            new LanguageAction(),
+            new FaviconAction(),
+        ];
+    }
+
+    /** @return list<\KalimeroMK\SeoReport\Actions\AnalysisActionInterface> */
+    private function getPerformanceActions(): array
+    {
+        return [
+            new CompressionAction(),
+            new TimingAction(),
+            new PageSizeAction(),
+            new HttpRequestsAction(),
+            new CacheHeadersAction(),
+            new RedirectsAction(),
+            new CookieFreeDomainsAction(),
+            new EmptySrcHrefAction(),
+            new ImageOptimizationAction(),
+            new DeferJavascriptAction(),
+            new RenderBlockingResourcesAction(),
+            new MinificationAction(),
+            new DomSizeAction(),
+            new DoctypeAction(),
+        ];
+    }
+
+    /** @return list<\KalimeroMK\SeoReport\Actions\AnalysisActionInterface> */
+    private function getSecurityActions(): array
+    {
+        return [
+            new HttpsEncryptionAction(),
+            new Http2Action(),
+            new MixedContentAction(),
+            new ServerSignatureAction(),
+            new UnsafeCrossOriginLinksAction(),
+            new HstsAction(),
+            new PlaintextEmailAction(),
+        ];
+    }
+
+    /** @return list<\KalimeroMK\SeoReport\Actions\AnalysisActionInterface> */
+    private function getMiscActions(): array
+    {
+        return [
+            new StructuredDataAction(),
+            new MetaViewportAction(),
+            new CharsetAction(),
+            new SitemapAction(),
+            new SocialLinksAction(),
+            new ContentLengthAction(),
+            new TextHtmlRatioAction(),
+            new InlineCssAction(),
+            new DeprecatedHtmlTagsAction(),
+            new LlmsTxtAction(),
+            new FlashContentAction(),
+            new IframesAction(),
+        ];
+    }
+
+    /** @return list<\KalimeroMK\SeoReport\Actions\AnalysisActionInterface> */
+    private function getTechnologyActions(): array
+    {
+        return [
+            new ServerIpAction(),
+            new DnsServersAction(),
+            new DmarcRecordAction(),
+            new SpfRecordAction(),
+            new SslCertificateAction(),
+            new ReverseDnsAction(),
+            new AnalyticsAction(),
+            new TechnologyDetectionAction(),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $stats
+     * @param list<string> $bodyKeywords
+     */
+    private function createContext(
+        array $data,
+        \Psr\Http\Message\ResponseInterface $response,
+        array $stats,
+        \DOMDocument $domDocument,
+        string $reportResponse,
+        string $pageText,
+        array $bodyKeywords,
+        string $docType,
+        string $inputUrl,
+    ): AnalysisContext {
+        return new AnalysisContext(
+            $this->config,
+            $response,
+            $stats,
+            $this->url ?? $inputUrl,
+            $domDocument,
+            $reportResponse,
+            $pageText,
+            $bodyKeywords,
+            $docType,
+            $data,
+        );
+    }
+
     private function isInternalUrl(string $url): bool
     {
-        $baseUrl = $this->url ?? '';
-        $baseHost = parse_url($baseUrl, PHP_URL_HOST);
-        $urlHost = parse_url($url, PHP_URL_HOST);
-        return $baseHost !== false && $urlHost !== false && str_starts_with((string) $urlHost, (string) $baseHost);
+        return $this->isInternalUrlWithBase($url, $this->url ?? '');
     }
 
     private function resolveUrl(string $url): string
     {
-        $baseUrl = $this->url ?? '';
-        $url = str_replace(['\\?', '\\&', '\\#', '\\~', '\\;'], ['?', '&', '#', '~', ';'], $url);
-        if (mb_strpos($url, '#') !== false) {
-            $url = mb_substr($url, 0, (int) mb_strpos($url, '#'));
+        return $this->resolveUrlWithBase($url, $this->url ?? '');
+    }
+
+
+    private function fetchAssetResponse(string $url): ?\Psr\Http\Message\ResponseInterface
+    {
+        $client = $this->httpClient ?? new HttpClient();
+        $proxy = $this->config->getRequestProxy();
+        $proxyOpt = $proxy !== null ? ['http' => $proxy, 'https' => $proxy] : [];
+
+        try {
+            return $client->request('HEAD', $url, [
+                'version' => $this->config->getRequestHttpVersion(),
+                'proxy' => $proxyOpt,
+                'timeout' => $this->config->getRequestTimeout(),
+                'allow_redirects' => [
+                    'max' => 10,
+                    'strict' => true,
+                    'referer' => true,
+                    'protocols' => ['http', 'https'],
+                    'track_redirects' => true,
+                ],
+                'headers' => [
+                    'User-Agent' => $this->config->getRequestUserAgent(),
+                ],
+                'http_errors' => false,
+            ]);
+        } catch (GuzzleException) {
+            return null;
         }
-        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
-            return $url;
-        }
-        $scheme = parse_url($baseUrl, PHP_URL_SCHEME);
-        $host = parse_url($baseUrl, PHP_URL_HOST);
-        if (str_starts_with($url, '//')) {
-            return ($scheme ?? 'https') . '://' . trim($url, '/');
-        }
-        if (str_starts_with($url, '/')) {
-            return rtrim(($scheme ?? 'https') . '://' . ($host ?? ''), '/') . '/' . ltrim($url, '/');
-        }
-        if (str_starts_with($url, 'data:image') || str_starts_with($url, 'tel') || str_starts_with($url, 'mailto')) {
-            return $url;
-        }
-        return rtrim(($scheme ?? 'https') . '://' . ($host ?? ''), '/') . '/' . ltrim($url, '/');
     }
 
     private function formatRobotsRule(string $value): string
