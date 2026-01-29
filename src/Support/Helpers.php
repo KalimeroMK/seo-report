@@ -30,5 +30,3 @@ if (!function_exists('seo_report_clean_tag_text')) {
         return trim(is_string($replaced) ? $replaced : '');
     }
 }
-
-// Proxy is now provided via SeoReportConfig::getRequestProxy() (framework-agnostic).
