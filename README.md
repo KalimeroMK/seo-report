@@ -39,16 +39,15 @@ php run_test.php ogledalo.mk | jq
 
 **Output:** JSON API response with analysis results.
 
-## Architecture (Quick Guide)
+## Checks Covered
 
-- `SeoAnalyzer` orchestrates fetching + parsing and then runs action classes.
-- `src/Actions/` groups checks by category: `Seo`, `Performance`, `Security`, `Misc`, `Technology`.
-- Each action implements `AnalysisActionInterface` and returns result keys to merge.
-- `AnalysisContext` carries shared data (DOM, response, stats, config, computed arrays).
+The report is grouped by categories and includes checks like:
 
-Adding a new check:
-1) Create an action class in the right category that implements `AnalysisActionInterface`.
-2) Add it to the corresponding `get*Actions()` list in `SeoAnalyzer`.
+- **SEO:** title, meta description, headings (H1-H6), keyword consistency, image alts, canonical, hreflang, robots, noindex, in-page links, nofollow, language, favicon, friendly URLs
+- **Performance:** compression, load time, TTFB, page size, HTTP requests, cache headers, redirects, cookie-free domains, empty src/href, image optimization, defer JS, render blocking, minification, DOM size, doctype
+- **Security:** HTTPS, HTTP/2, mixed content, server signature, unsafe cross-origin links, HSTS, plaintext emails
+- **Misc:** structured data, meta viewport, charset, sitemap, social links, content length, text/HTML ratio, inline CSS, deprecated HTML tags, llms.txt, flash, iframes
+- **Technology:** server IP, DNS, DMARC/SPF, SSL certificate, reverse DNS, analytics and tech detection
 
 ## What It Returns
 
