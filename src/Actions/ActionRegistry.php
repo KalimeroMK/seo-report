@@ -14,7 +14,9 @@ use KalimeroMK\SeoReport\Actions\Misc\LlmsTxtAction;
 use KalimeroMK\SeoReport\Actions\Misc\MetaViewportAction;
 use KalimeroMK\SeoReport\Actions\Misc\SitemapAction;
 use KalimeroMK\SeoReport\Actions\Misc\SocialLinksAction;
+use KalimeroMK\SeoReport\Actions\Misc\AccessibilityAction;
 use KalimeroMK\SeoReport\Actions\Misc\StructuredDataAction;
+use KalimeroMK\SeoReport\Actions\Misc\StructuredDataValidationAction;
 use KalimeroMK\SeoReport\Actions\Misc\TextHtmlRatioAction;
 use KalimeroMK\SeoReport\Actions\Performance\CacheHeadersAction;
 use KalimeroMK\SeoReport\Actions\Performance\CompressionAction;
@@ -24,6 +26,7 @@ use KalimeroMK\SeoReport\Actions\Performance\DoctypeAction;
 use KalimeroMK\SeoReport\Actions\Performance\DomSizeAction;
 use KalimeroMK\SeoReport\Actions\Performance\EmptySrcHrefAction;
 use KalimeroMK\SeoReport\Actions\Performance\HttpRequestsAction;
+use KalimeroMK\SeoReport\Actions\Performance\ResourceHintsAction;
 use KalimeroMK\SeoReport\Actions\Performance\ImageOptimizationAction;
 use KalimeroMK\SeoReport\Actions\Performance\MinificationAction;
 use KalimeroMK\SeoReport\Actions\Performance\PageSizeAction;
@@ -35,16 +38,23 @@ use KalimeroMK\SeoReport\Actions\Security\HttpsEncryptionAction;
 use KalimeroMK\SeoReport\Actions\Security\HstsAction;
 use KalimeroMK\SeoReport\Actions\Security\MixedContentAction;
 use KalimeroMK\SeoReport\Actions\Security\PlaintextEmailAction;
+use KalimeroMK\SeoReport\Actions\Security\SecurityHeadersAction;
 use KalimeroMK\SeoReport\Actions\Security\ServerSignatureAction;
 use KalimeroMK\SeoReport\Actions\Security\UnsafeCrossOriginLinksAction;
 use KalimeroMK\SeoReport\Actions\Seo\CanonicalAction;
+use KalimeroMK\SeoReport\Actions\Seo\DuplicateContentAction;
+use KalimeroMK\SeoReport\Actions\Seo\InternalLinkingAction;
 use KalimeroMK\SeoReport\Actions\Seo\ContentKeywordsAction;
 use KalimeroMK\SeoReport\Actions\Seo\FaviconAction;
+use KalimeroMK\SeoReport\Actions\Seo\ContentQualityAction;
 use KalimeroMK\SeoReport\Actions\Seo\HeadingsAction;
 use KalimeroMK\SeoReport\Actions\Seo\HreflangAction;
+use KalimeroMK\SeoReport\Actions\Seo\InternationalSeoAction;
+use KalimeroMK\SeoReport\Actions\Seo\PaginationAction;
 use KalimeroMK\SeoReport\Actions\Seo\ImageKeywordsAction;
 use KalimeroMK\SeoReport\Actions\Seo\InPageLinksAction;
 use KalimeroMK\SeoReport\Actions\Seo\LanguageAction;
+use KalimeroMK\SeoReport\Actions\Seo\MobileUsabilityAction;
 use KalimeroMK\SeoReport\Actions\Seo\LinkUrlReadabilityAction;
 use KalimeroMK\SeoReport\Actions\Seo\MetaDescriptionAction;
 use KalimeroMK\SeoReport\Actions\Seo\NofollowLinksAction;
@@ -53,6 +63,7 @@ use KalimeroMK\SeoReport\Actions\Seo\NotFoundAction;
 use KalimeroMK\SeoReport\Actions\Seo\OpenGraphAction;
 use KalimeroMK\SeoReport\Actions\Seo\RobotsAction;
 use KalimeroMK\SeoReport\Actions\Seo\SeoFriendlyUrlAction;
+use KalimeroMK\SeoReport\Actions\Seo\UrlStructureAction;
 use KalimeroMK\SeoReport\Actions\Seo\TitleAction;
 use KalimeroMK\SeoReport\Actions\Seo\TwitterCardsAction;
 use KalimeroMK\SeoReport\Actions\Technology\AnalyticsAction;
@@ -81,13 +92,20 @@ final class ActionRegistry
             new OpenGraphAction(),
             new TwitterCardsAction(),
             new SeoFriendlyUrlAction(),
+            new UrlStructureAction(),
             new CanonicalAction(),
             new HreflangAction(),
+            new InternationalSeoAction(),
+            new PaginationAction(),
             new NotFoundAction(),
             new RobotsAction(),
             new NoindexHeaderAction(),
             new LanguageAction(),
             new FaviconAction(),
+            new DuplicateContentAction(),
+            new InternalLinkingAction(),
+            new MobileUsabilityAction(),
+            new ContentQualityAction(),
         ];
     }
 
@@ -99,6 +117,7 @@ final class ActionRegistry
             new TimingAction(),
             new PageSizeAction(),
             new HttpRequestsAction(),
+            new ResourceHintsAction(),
             new CacheHeadersAction(),
             new RedirectsAction(),
             new CookieFreeDomainsAction(),
@@ -123,6 +142,7 @@ final class ActionRegistry
             new UnsafeCrossOriginLinksAction(),
             new HstsAction(),
             new PlaintextEmailAction(),
+            new SecurityHeadersAction(),
         ];
     }
 
@@ -131,10 +151,12 @@ final class ActionRegistry
     {
         return [
             new StructuredDataAction(),
+            new StructuredDataValidationAction(),
             new MetaViewportAction(),
             new CharsetAction(),
             new SitemapAction(),
             new SocialLinksAction(),
+            new AccessibilityAction(),
             new ContentLengthAction(),
             new TextHtmlRatioAction(),
             new InlineCssAction(),

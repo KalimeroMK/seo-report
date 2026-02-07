@@ -8,6 +8,10 @@ SEO analysis library: analyze a URL or sitemap, run SEO/performance/security che
 - ext-dom, ext-json
 - guzzlehttp/guzzle ^7.2
 
+**Optional (for advanced features):**
+- Docker 20.10+ (for Core Web Vitals, JS rendering, screenshots)
+- Docker Compose 2.0+
+
 **No framework required.** Use the same package in Laravel, Yii, Symfony, or standalone.
 
 ## Installation
@@ -44,10 +48,50 @@ php run_test.php ogledalo.mk | jq
 The report is grouped by categories and includes checks like:
 
 - **SEO:** title, meta description, headings (H1-H6), keyword consistency, image alts, canonical, hreflang, robots, noindex, in-page links, nofollow, language, favicon, friendly URLs
-- **Performance:** compression, load time, TTFB, page size, HTTP requests, cache headers, redirects, cookie-free domains, empty src/href, image optimization, defer JS, render blocking, minification, DOM size, doctype
-- **Security:** HTTPS, HTTP/2, mixed content, server signature, unsafe cross-origin links, HSTS, plaintext emails
-- **Misc:** structured data, meta viewport, charset, sitemap, social links, content length, text/HTML ratio, inline CSS, deprecated HTML tags, llms.txt, flash, iframes
+- **Content Quality:** duplicate content detection, internal linking analysis, content readability (Flesch score), keyword stuffing detection, thin content detection
+- **Performance:** compression, load time, TTFB, page size, HTTP requests, cache headers, redirects, cookie-free domains, empty src/href, image optimization, defer JS, render blocking, minification, DOM size, doctype, resource hints (preconnect, preload, prefetch)
+- **Security:** HTTPS, HTTP/2, mixed content, server signature, unsafe cross-origin links, HSTS, plaintext emails, security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+- **Mobile:** viewport configuration, touch target size, font size readability, flexible layout detection
+- **Misc:** structured data (Open Graph, Twitter Cards, Schema.org validation), meta viewport, charset, sitemap, social links, content length, text/HTML ratio, inline CSS, deprecated HTML tags, llms.txt, flash, iframes, accessibility checks
 - **Technology:** server IP, DNS, DMARC/SPF, SSL certificate, reverse DNS, analytics and tech detection
+
+### Advanced Features (with Docker)
+
+With Docker installed, you get additional real-world analysis:
+
+- **Core Web Vitals:** Real LCP, FID, CLS, TTFB using Google Lighthouse (no API key needed)
+- **JavaScript Rendering:** Detect React/Vue/Angular, hydration issues, console errors
+- **Screenshots:** Desktop, mobile, and tablet screenshots
+- **Advanced Technology Detection:** Detailed tech stack using Wappalyzer
+
+---
+
+## Docker Setup (Optional but Recommended)
+
+For **real Core Web Vitals** and **JavaScript SEO analysis**, install Docker:
+
+```bash
+# 1. Build Docker images (one-time setup)
+cd vendor/kalimeromk/seo-report/docker  # or wherever the package is
+docker-compose build
+
+# 2. Verify it works
+docker-compose run lighthouse https://example.com
+```
+
+**That's it!** No API keys, no registration, no rate limits.
+
+### Why Docker?
+
+| Feature | Without Docker | With Docker |
+|---------|---------------|-------------|
+| Core Web Vitals | ❌ Proxy estimates only | ✅ Real Chrome metrics (LCP, FID, CLS) |
+| JavaScript SEO | ❌ Can't analyze JS | ✅ Detects React/Vue/Hydration issues |
+| Screenshots | ❌ Not available | ✅ Desktop/Mobile/Tablet screenshots |
+| Cost | Free | Free (just your server) |
+| Rate Limits | None | None |
+
+---
 
 ## What It Returns
 
@@ -107,10 +151,11 @@ The package returns a JSON API response with this structure:
         }
     },
     "categories": {
-        "seo": ["title", "title_optimal_length", "meta_description", "meta_description_optimal_length", "headings", "h1_usage", "header_tag_usage", "content_keywords", "keyword_consistency", "image_keywords", "open_graph", "twitter_cards", "seo_friendly_url", "canonical_tag", "canonical_self_reference", "hreflang", "404_page", "robots", "noindex", "robots_directives", "noindex_header", "in_page_links", "nofollow_links", "link_url_readability", "language", "favicon"],
-        "performance": ["text_compression", "brotli_compression", "load_time", "ttfb", "page_size", "http_requests", "static_cache_headers", "expires_headers", "avoid_redirects", "redirect_chains", "cookie_free_domains", "empty_src_or_href", "image_format", "image_dimensions", "image_lazy_loading", "image_size_optimization", "lcp_proxy", "cls_proxy", "defer_javascript", "render_blocking_resources", "minification", "dom_size", "doctype"],
-        "security": ["https_encryption", "http2", "mixed_content", "server_signature", "unsafe_cross_origin_links", "htst", "plaintext_email"],
-        "miscellaneous": ["structured_data", "meta_viewport", "charset", "sitemap", "social", "content_length", "text_html_ratio", "inline_css", "deprecated_html_tags", "llms_txt", "flash_content", "iframes"],
+        "seo": ["title", "title_optimal_length", "meta_description", "meta_description_optimal_length", "headings", "h1_usage", "header_tag_usage", "content_keywords", "keyword_consistency", "image_keywords", "open_graph", "twitter_cards", "seo_friendly_url", "canonical_tag", "canonical_self_reference", "hreflang", "404_page", "robots", "noindex", "robots_directives", "noindex_header", "in_page_links", "nofollow_links", "link_url_readability", "language", "favicon", "duplicate_h1", "title_uniqueness", "thin_content", "content_uniqueness", "meta_description_quality", "canonical_effectiveness", "link_ratio", "link_distribution", "contextual_links", "outbound_links", "anchor_text_quality", "url_length", "url_depth", "url_parameters", "url_format", "trailing_slash", "url_case", "url_encoding", "international_seo", "pagination"],
+        "performance": ["text_compression", "brotli_compression", "load_time", "ttfb", "page_size", "http_requests", "static_cache_headers", "expires_headers", "avoid_redirects", "redirect_chains", "cookie_free_domains", "empty_src_or_href", "image_format", "image_dimensions", "image_lazy_loading", "image_size_optimization", "lcp_proxy", "cls_proxy", "defer_javascript", "render_blocking_resources", "minification", "dom_size", "doctype", "preconnect_hints", "dns_prefetch_hints", "preload_hints", "prefetch_hints", "resource_hints_coverage"],
+        "security": ["https_encryption", "http2", "mixed_content", "server_signature", "unsafe_cross_origin_links", "hsts", "plaintext_email", "content_security_policy", "x_frame_options", "x_content_type_options", "referrer_policy", "permissions_policy", "cross_origin_policies", "security_headers_score"],
+        "mobile": ["viewport_config", "touch_target_size", "font_size_readability", "flexible_layout", "mobile_friendly_patterns", "zoom_accessibility"],
+        "miscellaneous": ["structured_data", "structured_data_validation", "meta_viewport", "charset", "sitemap", "social", "content_length", "text_html_ratio", "inline_css", "deprecated_html_tags", "llms_txt", "flash_content", "iframes", "form_labels", "skip_navigation", "aria_usage", "heading_hierarchy", "link_text_quality", "table_accessibility"],
         "technology": ["server_ip", "dns_servers", "dmarc_record", "spf_record", "ssl_certificate", "reverse_dns", "analytics", "technology_detection"]
     }
 }
@@ -135,7 +180,7 @@ Each check in `results` has:
 - `https_encryption` - Whether HTTPS is used (bool via passed)
 - `structured_data` - Open Graph, Twitter, Schema.org (array)
 - `http_requests` - Count of JS/CSS/Images/etc. (array)
-- And 55+ more checks...
+- And 70+ more checks...
 
 ## Usage in Code
 
@@ -174,6 +219,43 @@ if ($results['title']['passed']) {
 $json = $result->toJson();
 $array = $result->toArray();
 ```
+
+### Advanced Usage (with Docker)
+
+Use `SeoAnalyzerWithDocker` instead of `SeoAnalyzer` to get real Core Web Vitals and JavaScript analysis:
+
+```php
+use KalimeroMK\SeoReport\SeoAnalyzerWithDocker;
+use KalimeroMK\SeoReport\Config\SeoReportConfig;
+
+$config = new SeoReportConfig([]);
+
+// Create analyzer with Docker support
+$analyzer = new SeoAnalyzerWithDocker($config);
+
+// Analyze URL - automatically includes Docker checks if available
+$result = $analyzer->analyze('https://example.com');
+
+// Check if Docker is available
+if ($analyzer->hasDockerSupport()) {
+    echo "Docker features enabled!";
+}
+
+// Get specific Docker-based results
+$cwv = $analyzer->getCoreWebVitals('https://example.com');
+echo "LCP: " . $cwv['performance']['metrics']['lcp'] . "ms";
+
+// Take screenshot
+$screenshot = $analyzer->takeScreenshot('https://example.com', 'mobile');
+$base64Image = $screenshot['screenshot']['base64'];
+
+// JavaScript analysis
+$js = $analyzer->getJavaScriptAnalysis('https://example.com');
+echo "Framework: " . $js['pageInfo']['framework']; // React, Vue, etc.
+echo "Console errors: " . $js['console']['errors'];
+```
+
+**Without Docker?** No problem! `SeoAnalyzerWithDocker` gracefully falls back to basic analysis.
 
 ### Custom Configuration
 
@@ -294,7 +376,7 @@ $report->save();
 
 ## All Available Checks
 
-### SEO (20 checks)
+### SEO (33+ checks)
 - `title` - Page title tag
 - `title_optimal_length` - Title optimal length (50-60 chars)
 - `meta_description` - Meta description tag
@@ -317,8 +399,45 @@ $report->save();
 - `language` - HTML lang attribute
 - `favicon` - Favicon presence
 
-### Performance (9 checks)
-- `text_compression` - Gzip compression
+**Content Quality & Duplicate Content:**
+- `duplicate_h1` - Multiple H1 tags detection
+- `title_uniqueness` - Title vs H1 duplication check
+- `thin_content` - Low word count detection (< 300 words)
+- `content_uniqueness` - Boilerplate content ratio analysis
+- `meta_description_quality` - Meta description quality check
+- `canonical_effectiveness` - Canonical tag implementation check
+- `readability_score` - Flesch Reading Ease score
+- `keyword_stuffing` - Excessive keyword density detection
+- `title_quality` - Title format analysis (power words, numbers)
+- `content_structure` - Paragraph length and heading hierarchy
+
+**Internal Linking:**
+- `link_ratio` - Internal vs external link ratio
+- `link_distribution` - Duplicate links and excessive links
+- `contextual_links` - Descriptive vs navigational links
+- `outbound_links` - Self-referencing link detection
+- `anchor_text_quality` - Empty/short anchor text detection
+
+**URL Structure:**
+- `url_length` - URL length validation (< 115 chars)
+- `url_depth` - Path depth analysis (max 3 levels)
+- `url_parameters` - Query parameter analysis
+- `url_format` - Underscores, case, special chars check
+- `trailing_slash` - Trailing slash consistency
+
+**International SEO:**
+- `hreflang_validation` - Valid language codes
+- `html_lang` - HTML lang attribute validation
+- `language_consistency` - HTML lang vs hreflang match
+- `x_default_hreflang` - X-default fallback check
+
+**Pagination:**
+- `pagination_detection` - Pagination indicators
+- `rel_next_prev` - Next/prev link detection
+- `infinite_scroll` - Infinite scroll detection
+
+### Performance (14+ checks)
+- `text_compression` - Gzip/Brotli compression
 - `load_time` - Page load time
 - `page_size` - HTML file size
 - `http_requests` - Number of resources (JS/CSS/Images)
@@ -327,17 +446,43 @@ $report->save();
 - `minification` - JS/CSS minification check
 - `dom_size` - DOM nodes count
 - `doctype` - DOCTYPE declaration
+- `static_cache_headers` - Static asset caching
+- `expires_headers` - Cache expiration headers
+- `redirect_chains` - Redirect chain detection
 
-### Security (7 checks)
+**Resource Hints:**
+- `preconnect_hints` - Preconnect to external domains
+- `dns_prefetch_hints` - DNS prefetch hints
+- `preload_hints` - Preload critical resources
+- `prefetch_hints` - Prefetch next-page resources
+
+### Security (14+ checks)
 - `https_encryption` - HTTPS usage
 - `http2` - HTTP/2 protocol
 - `mixed_content` - HTTP resources on HTTPS page
 - `server_signature` - Server header exposure
 - `unsafe_cross_origin_links` - Links without rel="noopener"
-- `htst` - HTTP Strict Transport Security header
+- `hsts` - HTTP Strict Transport Security header
 - `plaintext_email` - Plaintext emails in HTML
 
-### Miscellaneous (12 checks)
+**Security Headers:**
+- `content_security_policy` - CSP header validation
+- `x_frame_options` - Clickjacking protection (DENY/SAMEORIGIN)
+- `x_content_type_options` - MIME sniffing protection
+- `referrer_policy` - Referrer information control
+- `permissions_policy` - Feature policy restrictions
+- `cross_origin_policies` - COOP/COEP/CORP headers
+- `security_headers_score` - Overall security score (A-D rating)
+
+### Mobile (6 checks)
+- `viewport_config` - Viewport meta tag validation
+- `touch_target_size` - Minimum 44x44px touch targets (WCAG 2.1)
+- `font_size_readability` - Minimum 12px font size
+- `flexible_layout` - Fixed width detection
+- `mobile_friendly_patterns` - Flash, frames, deprecated plugins
+- `zoom_accessibility` - User zoom prevention detection
+
+### Miscellaneous (18+ checks)
 - `structured_data` - Open Graph, Twitter Cards, Schema.org
 - `meta_viewport` - Viewport meta tag
 - `charset` - Character encoding
@@ -351,6 +496,21 @@ $report->save();
 - `flash_content` - Flash/Shockwave content detection
 - `iframes` - iFrames usage
 
+**Structured Data Validation:**
+- `json_ld_validation` - JSON-LD syntax validation
+- `schema_requirements` - Required properties for common schemas
+- `duplicate_ids` - Duplicate @id detection
+- `structured_data_images` - Image URL validation
+- `schema_context` - @context validation
+
+**Accessibility:**
+- `form_labels` - Form inputs with missing labels
+- `skip_navigation` - Skip to content link
+- `aria_usage` - ARIA roles and attributes validation
+- `heading_hierarchy` - H1-H6 hierarchy validation
+- `link_text_quality` - Generic link text detection
+- `table_accessibility` - Table headers and captions
+
 ### Technology (8 checks, no external APIs)
 - `server_ip` - Resolved server IP (gethostbyname)
 - `dns_servers` - NS records
@@ -360,6 +520,37 @@ $report->save();
 - `reverse_dns` - PTR record for server IP (gethostbyaddr)
 - `analytics` - Detected analytics (e.g. Google Analytics)
 - `technology_detection` - Detected tech (e.g. jQuery, Font Awesome, Facebook Pixel)
+
+### Docker-Based Checks (requires Docker)
+
+These checks run only when Docker is available:
+
+**Core Web Vitals (Real Chrome Metrics):**
+- `core_web_vitals` - Real LCP, FID, CLS, TTFB using Google Lighthouse
+  - `lcp` - Largest Contentful Paint (ms) - should be < 2500ms
+  - `fid` - First Input Delay (ms) - should be < 100ms
+  - `cls` - Cumulative Layout Shift - should be < 0.1
+  - `ttfb` - Time to First Byte (ms)
+  - `performance_score` - Lighthouse performance score (0-100)
+
+**JavaScript Rendering Analysis:**
+- `javascript_rendering` - Full browser JavaScript execution check
+  - `framework` - Detected framework (React, Vue, Angular, Next.js, Nuxt.js)
+  - `has_hydration` - Whether client-side hydration is detected
+  - `title_rendered` - Whether title is rendered by JS
+  - `h1_rendered` - Whether H1 is rendered by JS
+  - `render_time_ms` - Total render time
+  - `console_errors` - JavaScript console errors count
+
+**Advanced Technology Detection:**
+- `advanced_technology_detection` - Detailed tech stack using Wappalyzer
+  - CMS, frameworks, analytics, hosting, CDN detection
+
+**Screenshots:**
+- `screenshot` - Available via `takeScreenshot()` method
+  - Desktop, mobile, tablet viewports
+  - Base64 encoded images
+  - Visual metrics (CLS during load)
 
 ## Exceptions
 
@@ -371,6 +562,73 @@ try {
 } catch (SeoAnalyzerException $e) {
     // URL cannot be fetched (connection error, timeout, etc.)
     echo "Error: " . $e->getMessage();
+}
+```
+
+## Docker FAQ
+
+### Do I need Docker?
+**No.** The package works great without Docker. Docker is only needed for:
+- Real Core Web Vitals (LCP, FID, CLS)
+- JavaScript rendering analysis
+- Screenshots
+
+Without Docker, you still get 70+ SEO checks.
+
+### How much does Docker cost?
+**Free.** You run it on your own server. No API fees, no rate limits.
+
+### What are the system requirements for Docker?
+- Docker 20.10+
+- Docker Compose 2.0+
+- 4GB+ RAM (for headless Chrome)
+- 2GB disk space
+
+### Can I use this in production?
+**Yes.** Docker containers are isolated and run fresh on every request. No state is preserved between runs.
+
+### Is caching used?
+**No.** By default, all Docker-based checks return fresh results. This is intentional - you want to see if issues were fixed after making changes.
+
+### What if Docker is not available?
+`SeoAnalyzerWithDocker` gracefully falls back to basic analysis. No errors, just fewer features.
+
+```php
+$analyzer = new SeoAnalyzerWithDocker($config);
+
+if ($analyzer->hasDockerSupport()) {
+    echo "Full analysis with Core Web Vitals";
+} else {
+    echo "Basic analysis (no Docker available)";
+}
+```
+
+### Example: Full Analysis with Docker
+
+```php
+use KalimeroMK\SeoReport\SeoAnalyzerWithDocker;
+use KalimeroMK\SeoReport\Config\SeoReportConfig;
+
+$config = new SeoReportConfig([]);
+$analyzer = new SeoAnalyzerWithDocker($config);
+
+$result = $analyzer->analyze('https://example.com');
+
+// Results include Docker-based checks if available
+$results = $result->getResults();
+
+if (isset($results['core_web_vitals'])) {
+    $cwv = $results['core_web_vitals']['value'];
+    echo "LCP: {$cwv['lcp']}ms\n";
+    echo "CLS: {$cwv['cls']}\n";
+    echo "Performance Score: {$cwv['performance_score']}\n";
+}
+
+if (isset($results['javascript_rendering'])) {
+    $js = $results['javascript_rendering']['value'];
+    echo "Framework: {$js['framework']}\n";
+    echo "Hydration: " . ($js['has_hydration'] ? 'Yes' : 'No') . "\n";
+    echo "Console Errors: {$js['console_errors']}\n";
 }
 ```
 

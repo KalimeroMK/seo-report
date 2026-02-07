@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Lighthouse CI Service for Core Web Vitals
+  lighthouse:
+    build:
+      context: ./lighthouse
+      dockerfile: Dockerfile
+    container_name: seo-lighthouse
+    # No ports needed - runs on-demand
+    # Usage: docker-compose run lighthouse https://example.com
+    
+  # Headless Chromium for JS Rendering & Screenshots
+  chromium:
+    build:
+      context: ./chromium
+      dockerfile: Dockerfile
+    container_name: seo-chromium
+    # Usage: 
+    # docker-compose run chromium /app/render.js https://example.com
+    # docker-compose run chromium /app/screenshot.js https://example.com mobile
+    
+  # Wappalyzer for Technology Detection
+  wappalyzer:
+    build:
+      context: ./wappalyzer
+      dockerfile: Dockerfile
+    container_name: seo-wappalyzer
+    # Usage: docker-compose run wappalyzer https://example.com
+
+# Optional services (uncomment if needed):
+
+#   # Redis for caching (NOT recommended for SEO analysis)
+#   # Only enable if you have specific batch processing needs
+#   redis:
+#     image: redis:7-alpine
+#     container_name: seo-redis
+#     ports:
+#       - "6379:6379"
+#     volumes:
+#       - redis_data:/data
+#     command: redis-server --appendonly yes
+#     profiles:
+#       - optional
+# 
+#   # RabbitMQ for async processing
+#   rabbitmq:
+#     image: rabbitmq:3-management-alpine
+#     container_name: seo-rabbitmq
+#     ports:
+#       - "5672:5672"
+#       - "15672:15672"
+#     volumes:
+#       - rabbitmq_data:/var/lib/rabbitmq
+#     profiles:
+#       - optional
+
+# volumes:
+#   redis_data:
+#   rabbitmq_data:

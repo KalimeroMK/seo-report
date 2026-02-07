@@ -19,30 +19,67 @@ final class ImageOptimizationAction implements AnalysisActionInterface
         $largeImages = (array) $context->getData('large_images', []);
         $largestImage = $context->getData('largest_image');
 
+        $modernFormats = ['webp', 'avif', 'jxl'];
+        $legacyImages = [];
+        $modernImages = [];
+
+        foreach ($imageFormats as $img) {
+            $ext = strtolower(pathinfo($img['url'] ?? '', PATHINFO_EXTENSION));
+            if (!in_array($ext, $modernFormats, true)) {
+                $legacyImages[] = $img;
+            } else {
+                $modernImages[] = $img;
+            }
+        }
+
         $result = [
-            'image_format' => ['passed' => true, 'importance' => 'medium', 'value' => $imageFormatsConfig],
+            'image_format' => ['passed' => true, 'importance' => 'medium', 'value' => [
+                'modern_formats_used' => count($modernImages),
+                'legacy_formats_used' => count($legacyImages),
+                'recommended_formats' => $imageFormatsConfig,
+            ]],
         ];
-        if ($imageFormats !== []) {
+        
+        $totalImages = count($modernImages) + count($legacyImages);
+        if ($totalImages > 0 && count($legacyImages) / $totalImages > 0.5) {
             $result['image_format']['passed'] = false;
-            $result['image_format']['errors'] = ['bad_format' => $imageFormats];
+            $result['image_format']['errors'] = [
+                'too_many_legacy_formats' => [
+                    'legacy_count' => count($legacyImages),
+                    'modern_count' => count($modernImages),
+                    'examples' => array_slice($legacyImages, 0, 5),
+                ]
+            ];
         }
 
         $result['image_dimensions'] = ['passed' => true, 'importance' => 'low', 'value' => null];
         if ($imagesMissingDimensions !== []) {
             $result['image_dimensions']['passed'] = false;
-            $result['image_dimensions']['errors'] = ['missing' => $imagesMissingDimensions];
+            $result['image_dimensions']['errors'] = [
+                'missing' => array_slice($imagesMissingDimensions, 0, 10),
+                'count' => count($imagesMissingDimensions),
+            ];
         }
 
         $result['image_lazy_loading'] = ['passed' => true, 'importance' => 'low', 'value' => null];
         if ($imagesMissingLazy !== []) {
             $result['image_lazy_loading']['passed'] = false;
-            $result['image_lazy_loading']['errors'] = ['missing' => $imagesMissingLazy];
+            $result['image_lazy_loading']['errors'] = [
+                'missing' => array_slice($imagesMissingLazy, 0, 10),
+                'count' => count($imagesMissingLazy),
+            ];
         }
 
-        $result['image_size_optimization'] = ['passed' => true, 'importance' => 'medium', 'value' => $maxImageBytes];
+        $result['image_size_optimization'] = ['passed' => true, 'importance' => 'medium', 'value' => [
+            'max_allowed_bytes' => $maxImageBytes,
+            'large_images_count' => count($largeImages),
+        ]];
         if ($largeImages !== []) {
             $result['image_size_optimization']['passed'] = false;
-            $result['image_size_optimization']['errors'] = ['too_large' => $largeImages];
+            $result['image_size_optimization']['errors'] = [
+                'too_large' => array_slice($largeImages, 0, 5),
+                'count' => count($largeImages),
+            ];
         }
 
         $lcpProxyLimit = $context->getConfig()->getReportLimitLcpProxyBytes();
@@ -55,7 +92,10 @@ final class ImageOptimizationAction implements AnalysisActionInterface
         $result['cls_proxy'] = ['passed' => true, 'importance' => 'medium', 'value' => count($imagesMissingDimensions)];
         if ($imagesMissingDimensions !== []) {
             $result['cls_proxy']['passed'] = false;
-            $result['cls_proxy']['errors'] = ['missing_dimensions' => $imagesMissingDimensions];
+            $result['cls_proxy']['errors'] = [
+                'missing_dimensions' => array_slice($imagesMissingDimensions, 0, 5),
+                'count' => count($imagesMissingDimensions),
+            ];
         }
 
         return $result;

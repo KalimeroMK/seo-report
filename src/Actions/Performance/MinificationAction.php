@@ -14,16 +14,23 @@ final class MinificationAction implements AnalysisActionInterface
         $nonMinifiedJs = (array) $context->getData('non_minified_js', []);
         $nonMinifiedCss = (array) $context->getData('non_minified_css', []);
 
+        $totalNonMinified = count($nonMinifiedJs) + count($nonMinifiedCss);
+
         $result = [
             'minification' => [
-                'passed' => true,
+                'passed' => $totalNonMinified === 0,
                 'importance' => 'low',
                 'value' => ['js' => count($nonMinifiedJs), 'css' => count($nonMinifiedCss)],
             ],
         ];
-        if ($nonMinifiedJs !== [] || $nonMinifiedCss !== []) {
-            $result['minification']['passed'] = false;
-            $result['minification']['errors'] = ['not_minified' => ['js' => $nonMinifiedJs, 'css' => $nonMinifiedCss]];
+        
+        if ($totalNonMinified > 0) {
+            $result['minification']['errors'] = [
+                'not_minified' => [
+                    'js' => $nonMinifiedJs,
+                    'css' => $nonMinifiedCss,
+                ],
+            ];
         }
 
         return $result;

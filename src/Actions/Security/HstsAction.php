@@ -11,14 +11,14 @@ final class HstsAction implements AnalysisActionInterface
 {
     public function handle(AnalysisContext $context): array
     {
-        $htstHeader = (array) $context->getData('hsts_header', []);
+        $hstsHeader = (array) $context->getData('hsts_header', []);
 
         $result = [
-            'htst' => ['passed' => true, 'importance' => 'low', 'value' => $htstHeader],
+            'hsts' => ['passed' => true, 'importance' => 'low', 'value' => $hstsHeader],
         ];
-        if ($htstHeader === []) {
-            $result['htst']['passed'] = false;
-            $result['htst']['errors'] = ['missing' => null];
+        if ($hstsHeader === []) {
+            $result['hsts']['passed'] = false;
+            $result['hsts']['errors'] = ['missing' => null];
         }
 
         return $result;
